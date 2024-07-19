@@ -1,0 +1,33 @@
+# ROS log files
+*.log
+*.bag
+
+# Build files
+build/
+devel/
+install/
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# ROS workspace files
+.ros/
+
+# User-specific files
+*~
+*.swp
+*.bak
+*.tmp
+
+# Python compiled files
+*.pyc
+*.pyo
+__pycache__/
+
+# Custom ignore rules
+*.DS_Store
+.idea/
+.vscode/
