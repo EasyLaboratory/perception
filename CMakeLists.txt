@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(image_receiver)
+project(perception)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -120,10 +120,27 @@ include_directories(
 # include
   ${catkin_INCLUDE_DIRS}
 )
+
+
+message("-==================================")
+message(${CATKIN_DEVEL_PREFIX})
+message("-==================================")
+
+install(FILES models/yolov8n_v1.pt
+        DESTINATION ${CATKIN_DEVEL_PREFIX}/share/models/
+)
+
+
 catkin_install_python(PROGRAMS
-   scripts/receiver.py
+   scripts/perception.py
+   scripts/yolo_image_processor.py
+   scripts/2Dto3DConvertor.py
+   scripts/perception_all_in_one.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+catkin_python_setup()
+
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
@@ -197,9 +214,7 @@ catkin_install_python(PROGRAMS
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
 
-#############
-## Testing ##
-#############
+
 
 ## Add gtest based cpp test target and link libraries
 # catkin_add_gtest(${PROJECT_NAME}-test test/test_image_receiver.cpp)
