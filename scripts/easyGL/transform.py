@@ -67,8 +67,8 @@ def construct_inverse_intrinsic(fov: float, width: int, height: int, is_degree=T
     fy = height / (2 * math.tan(fov / 2) + 0.1)
     cx = width / 2
     cy = height / 2
-    k_inv = np.array([[1 / fx, 0, -cx / fx]
-                      [0, 1 / fy, -cy / fy]
+    k_inv = np.array([[1 / fx, 0, -cx / fx],
+                      [0, 1 / fy, -cy / fy],
                       [0, 0, 1]])
     return k_inv
 
@@ -114,5 +114,10 @@ def unproject(u, v, inverse_K, inverse_E):
     return homo_word_xyz[0],homo_camera_xyz[1],homo_word_xyz[2]
 
 
+def camera2ned(point_camera):
+    R_camera_to_NED = np.array([[0, 1, 0],
+                            [0, 0, -1],
+                            [1, 0, 0]])
+    return point_camera@R_camera_to_NED
 
 

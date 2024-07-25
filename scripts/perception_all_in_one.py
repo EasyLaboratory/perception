@@ -19,6 +19,8 @@ bridge = CvBridge()
 annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=9)
 odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
 
+intrinsic_matrix = construct_inverse_intrinsic(90,1920,1080,True)
+
 
 def perception_callback(rgb_msg,depth_msg):
     global annotated_frame_publisher
@@ -97,4 +99,5 @@ def sensor_perception():
     rospy.spin()
 
 if __name__ == "__main__":
-    sensor_perception()
+    # sensor_perception()
+    print(intrinsic_matrix)
