@@ -77,4 +77,5 @@ def get_annotated_frame(result:ultralytics.engine.results.Results,box_list:List[
 
 
 
+
     

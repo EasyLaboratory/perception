@@ -56,7 +56,7 @@ def construct_intrinsic(fov: float, width: int, height: int, is_degree=True):
     fy = height / (2 * math.tan(fov / 2) + 0.1)
     cx = width / 2
     cy = height / 2
-    intrinsic = np.array([[fx, 0, cx][0, fy, cy][0, 0, 1]])
+    intrinsic = np.array([[fx, 0, cx],[0, fy, cy],[0, 0, 1]])
     return intrinsic
 
 
@@ -106,18 +106,63 @@ def rotation_z(theta):
     ])
 
 
-def unproject(u, v, inverse_K, inverse_E):
+def unproject(u, v, depth,inverse_K, inverse_E):
+    """
+    unproject the u,v point 
+    1. camera uv to camera xyz
+    2. camera xyz to NED
+    3. NED xyz to world xyz
+    """
+
+    # step1
     homo_uv = np.array([u, v, 1])
     camera_xyz = inverse_K @ homo_uv
-    homo_camera_xyz = np.array([camera_xyz, 1])
-    homo_word_xyz = inverse_E @ homo_camera_xyz
-    return homo_word_xyz[0],homo_camera_xyz[1],homo_word_xyz[2]
+    camera_xyz = camera_xyz*depth
+
+    # step2
+    mav_xyz = camera2mav(camera_xyz)
+    homo_mav_xyz = np.append(mav_xyz, 1)
+    homo_word_xyz = inverse_E @ homo_mav_xyz
+    return homo_word_xyz[0],homo_mav_xyz[1],homo_word_xyz[2]
 
 
-def camera2ned(point_camera):
-    R_camera_to_NED = np.array([[0, 1, 0],
-                            [0, 0, -1],
-                            [1, 0, 0]])
-    return point_camera@R_camera_to_NED
+def camera2mav(point_camera):
+    camera2mav = np.array([[0, 0, 1],
+                            [1, 0, 0],
+                            [0, 1, 0]])
+    
+    return camera2mav@point_camera
 
 
+def quaternion_to_rotation_matrix(quat):
+    w, x, y, z = quat
+    return np.array([
+        [1 - 2*y**2 - 2*z**2, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
+        [2*x*y + 2*z*w, 1 - 2*x**2 - 2*z**2, 2*y*z - 2*x*w],
+        [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x**2 - 2*y**2]
+    ])
+
+def construct_inverse_extrinsic_with_quaternion(quat,translation):
+    w, x, y, z = quat
+    
+    rotation = np.array([
+        [1 - 2*y**2 - 2*z**2, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
+        [2*x*y + 2*z*w, 1 - 2*x**2 - 2*z**2, 2*y*z - 2*x*w],
+        [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x**2 - 2*y**2]
+    ])
+    
+    extrinsic_matrix = np.eye(4)
+    extrinsic_matrix[:3, :3] = rotation
+    extrinsic_matrix[:3, 3] = translation
+
+    # extrinsic_inverse = np.linalg.inv(extrinsic_matrix)
+    return extrinsic_matrix
+    
+
+def unproject_uv_list(uv_list,depth_list,intrinsic,extrinsic):
+    xyz_world = []
+    for uv,depth in zip(uv_list,depth_list):
+        u = uv[0]
+        v = uv[1]
+        xyz_world.append(unproject(u,v,depth,intrinsic,extrinsic)) 
+    return xyz_world

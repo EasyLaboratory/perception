@@ -64,8 +64,8 @@ $$
 \begin{bmatrix}
     u \\
     v \\
-    0
-\end{bmatrix} = \begin{bmatrix}
+    1
+\end{bmatrix} = \frac{1}{Z_{c}} \begin{bmatrix}
     f_x & 0 & c_x \\
     0 & f_y & c_y \\
     0 & 0 & 1
@@ -73,7 +73,7 @@ $$
 \begin{bmatrix}
 x_c \\
 y_c \\
-1   \\
+z_c  \\
 \end{bmatrix}
 $$
 $$
