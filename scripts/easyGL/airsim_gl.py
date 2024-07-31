@@ -6,8 +6,7 @@ import ultralytics
 from easyGL import get_logger
 import numpy as np
 import cv2
-from typing import List
-from collections import defaultdict
+from typing import List,Dict
 import rospy
 
 logger = get_logger(__name__)
@@ -28,23 +27,23 @@ def track(model:ultralytics.YOLO,image:np.ndarray)->ultralytics.engine.results:
     return result
 
 
-def get_target_box(result:ultralytics.engine.results,target_category:List[str],target_track_id:int): 
-    boxes:ultralytics.engine.results.Boxes = result[0].boxes
-    res_target_boxes = []
-    res_target_id = []
-    res_target_category = []
-
-    for box in boxes:
-        category = box.cls  # 对象类别
+def get_target_box(results:List,target_category_list:List[str],target_track_id_list:int)->Dict: 
+    # {car:{1:[],2:[]}}
+    cat2id2box = {}
+    for result in results:
+        box:ultralytics.engine.results.Boxes = result.boxes
+        category = box.cls # 对象类别
         track_id = box.id # 跟踪 ID
         bbox = box.xywh  # 边界框信息
-        # 检查是否为 ID 为 2 的车辆
-        # if category in target_category and track_id in target_track_id:
-        if True:
-           res_target_boxes.append(bbox)
-           res_target_id.append(track_id)
-           res_target_category.append(target_track_id)
-    return res_target_boxes,res_target_category,res_target_id
+        # print(track_id)
+        # print(category)
+        # print(bbox)
+        if track_id is None:
+            return {}
+        if category in target_category_list:
+           cat2id2box[category.item()] = { entity.item():bbox for entity,bbox in zip(track_id,bbox)}
+        # print(cat2id2box)
+    return cat2id2box
 
 
 def get_uv(boxes:List[ultralytics.engine.results.Boxes]):

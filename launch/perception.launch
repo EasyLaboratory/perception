@@ -6,3 +6,5 @@
     <node name="perception_node" pkg="perception" type="perception_all_in_one.py" output="screen" launch-prefix = "$(arg venv)" >
     </node>
 </launch>
+
+

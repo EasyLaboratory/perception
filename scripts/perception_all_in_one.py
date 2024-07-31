@@ -4,21 +4,21 @@ from cv_bridge import CvBridge,CvBridgeError
 from easyGL.airsim_gl import *
 from pathlib import Path
 from ultralytics import YOLO
-from message_filters import Subscriber, TimeSynchronizer, ApproximateTimeSynchronizer
+from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
 from easyGL.transform import unproject_uv_list
 from typing import Tuple
 from geometry_msgs.msg import PointStamped
-from geometry_msgs.msg import Pose, Twist, Point, Quaternion
+from geometry_msgs.msg import Quaternion
 
 import tf.transformations
 from trajectory_msgs.msg import TrajectoryPoint
 
 
 current_dir = Path(__file__).resolve()
-project_root = current_dir.parent
-model_base_path = project_root/"model"
-model_path = model_base_path/"yolov8n_v1.pt"
+project_root = current_dir.parent.parent
+model_base_path = project_root/"models"
+model_path = model_base_path/"yolov10s_v1.pt"
 
 model:ultralytics.YOLO = YOLO(model_path)
 rospy.loginfo("init the yolo model")
@@ -110,23 +110,21 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
     global annotated_frame_publisher
     global bridge
     global model
-
     try:
         # Convert the ROS Image message to a format OpenCV can work with
         cv_image = bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='passthrough')
-        result=track(model,cv_image)
-        if len(result) <= 0:
+        results=track(model,cv_image)
+        if len(results) <= 0:
             return
-
-        result = result[0]
-        boxes,category,id = get_target_box(result,[0,1,2,3,4,5,6,7,8,9,10,11],[1])
+        # boxes,category,id = get_target_box(result,[0,1,2,3,4,5,6,7,8,9,10,11],[1])
+        cat2id2box = get_target_box(results,[0],[1])
         uv_list = get_uv(boxes)
         annotated_image=get_annotated_frame(result,boxes,uv_list) 
-        # Convert the processed image (result) back to a ROS Image message
-        annotated_msg = bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8')
+        # # Convert the processed image (result) back to a ROS Image message
+        # annotated_msg = bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8')
 
-        # Publish the annotaprint(a)ted target
-        annotated_frame_publisher.publish(annotated_msg)
+        # # Publish the annotaprint(a)ted target
+        # annotated_frame_publisher.publish(annotated_msg)
 
         """
         unproject the uv_list
@@ -134,44 +132,38 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
 
         2. unproject
         """
-        cv_depth = bridge.imgmsg_to_cv2(depth_msg,desired_encoding="passthrough")
-        depth_list = get_uv_depth_list(cv_depth,uv_list)
-        t = odemetry_msg.pose.pose.position
-        t_array = np.array([t.x,t.y,t.z])
-        o = odemetry_msg.pose.pose.orientation
-        o_array = np.array([o.w,o.x,o.y,o.z])
-        extrinsic_matrix = construct_inverse_extrinsic_with_quaternion(o_array,t_array)
-        unproject_world_points =unproject_uv_list(uv_list,depth_list,intrinsic_matrix,extrinsic_matrix)
+        # cv_depth = bridge.imgmsg_to_cv2(depth_msg,desired_encoding="passthrough")
+        # depth_list = get_uv_depth_list(cv_depth,uv_list)
+        # t = odemetry_msg.pose.pose.position
+        # t_array = np.array([t.x,t.y,t.z])
+        # o = odemetry_msg.pose.pose.orientation
+        # o_array = np.array([o.w,o.x,o.y,o.z])
+        # extrinsic_matrix = construct_inverse_extrinsic_with_quaternion(o_array,t_array)
+        # unproject_world_points =unproject_uv_list(uv_list,depth_list,intrinsic_matrix,extrinsic_matrix)
 
-        point = unproject_world_points[0]
-        res_point = PointStamped()
-        # print("uv list",uv_list)
-        # print("t_array",t_array)
-        # print("depth_list",depth_list)
-        # print("world point",point)
-        # print("----------------------------------------------------------")
+        # point = unproject_world_points[0]
+        # res_point = PointStamped()
+        # # print("uv list",uv_list)
+        # # print("t_array",t_array)
+        # # print("depth_list",depth_list)
+        # # print("world point",point)
+        # # print("----------------------------------------------------------")
 
-        res_point.header.stamp = odemetry_msg.header.stamp
-        res_point.header.frame_id = "drone_1"
-        res_point.point.x = point[0]
-        res_point.point.y = point[1]
-        res_point.point.z = point[2]
+        # res_point.header.stamp = odemetry_msg.header.stamp
+        # res_point.header.frame_id = "drone_1"
+        # res_point.point.x = point[0]
+        # res_point.point.y = point[1]
+        # res_point.point.z = point[2]
 
-        point_publisher.publish(res_point)
-
-
-
-        simple_track(t_array,res_point)
-
-
+        # point_publisher.publish(res_point)
+        # odo_msg = Odometry()
+        # odo_msg.header.stamp = odemetry_msg.header.stamp
+        # odo_msg.header.frame_id = "drone_1"
+        # odo_msg.pose.pose.x = 1
 
 
 
-
-
-
-
-
+        # simple_track(t_array,res_point)
 
 
 
@@ -200,8 +192,8 @@ def sensor_perception():
     depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
 
     # drone odemetry
-    odom_local_ned = "odom_local_ned"
-    odemetry_topic = f"/airsim_node/{vehicle_name}/{odom_local_ned}"
+    odom_local_enu = "odom_local_enu"
+    odemetry_topic = f"/airsim_node/{vehicle_name}/{odom_local_enu}"
 
     rgb_sub = Subscriber(rgb_topic,Image)
     depth_sub = Subscriber(depth_topic,Image)
@@ -211,6 +203,9 @@ def sensor_perception():
 
     ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=10, slop=1)
     ats.registerCallback(perception_callback)
+    rospy.loginfo(rgb_topic)
+    rospy.loginfo(depth_topic)
+    rospy.loginfo(odemetry_topic)
     rospy.loginfo("初始化成功")
     rospy.spin()
 

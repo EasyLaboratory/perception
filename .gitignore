@@ -6,6 +6,7 @@
 build/
 devel/
 install/
+include/
 
 # CMake files
 CMakeFiles/

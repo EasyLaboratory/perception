@@ -9,4 +9,7 @@ intr = construct_inverse_intrinsic(90,1920,1080)
 # print(res)
 
 
-print(intr)
+a = {}
+cat = "c"
+a[cat] = {}
+print(a)
