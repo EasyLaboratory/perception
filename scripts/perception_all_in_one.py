@@ -6,7 +6,7 @@ from pathlib import Path
 from ultralytics import YOLO
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
-from easyGL.transform import unproject_uv_list
+from easyGL.transform import quaternion_from_euler
 from typing import Tuple
 from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import Quaternion
@@ -14,7 +14,6 @@ import signal
 import airsim
 import msgpackrpc.error
 from airsim import DrivetrainType
-import tf.transformations
 
 
 client = None
@@ -48,18 +47,6 @@ target_y=0
 
 def pub_cmd(event):
     client.moveToPositionAsync( target_y,target_x, -6, 4, 5 )
-
-
-def quaternion_from_euler(roll, pitch, yaw):
-    """
-    将欧拉角 (roll, pitch, yaw) 转换为四元数 (qx, qy, qz, qw)
-    """
-    qx = math.sin(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) - math.cos(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
-    qy = math.cos(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2)
-    qz = math.cos(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2) - math.sin(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2)
-    qw = math.cos(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
-    return [qx, qy, qz, qw]
-
 
 
 def get_uv_depth(cv_depth:np.ndarray,u,v):
@@ -152,12 +139,7 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
                 # Publish the annotaprint(a)ted target
                 annotated_frame_publisher.publish(annotated_msg)
             
-            """
-            unproject the uv_list
-            1. get the extrinsic matrix
 
-            2. unproject
-            """
             if x!=-1 and y!=-1:
                 cv_depth = bridge.imgmsg_to_cv2(depth_msg,desired_encoding="passthrough")
                 depth = get_uv_depth(cv_depth,x,y)
@@ -167,9 +149,6 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
                 o_array = np.array([o.w,o.x,o.y,o.z])
                 extrinsic_matrix = construct_inverse_extrinsic_with_quaternion(o_array,t_array)
                 world_point_ENU =unproject(x,y,depth,intrinsic_matrix,extrinsic_matrix)
-
-
-
 
                 res_point = PointStamped()
                 res_point.header.stamp = odemetry_msg.header.stamp

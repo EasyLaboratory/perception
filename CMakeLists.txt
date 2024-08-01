@@ -127,15 +127,9 @@ message("-==================================")
 message(${CATKIN_DEVEL_PREFIX})
 message("-==================================")
 
-install(FILES models/yolov8n_v1.pt
-        DESTINATION ${CATKIN_DEVEL_PREFIX}/share/models/
-)
 
 
 catkin_install_python(PROGRAMS
-   scripts/perception.py
-   scripts/yolo_image_processor.py
-   scripts/2Dto3DConvertor.py
    scripts/perception_all_in_one.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

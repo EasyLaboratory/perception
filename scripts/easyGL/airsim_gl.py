@@ -1,23 +1,14 @@
 import ultralytics.engine
 import ultralytics.engine.results
 from easyGL.transform import *
-from easyGL.utils import *
 import ultralytics
 from easyGL import get_logger
 import numpy as np
 import cv2
 from typing import List,Dict
-import rospy
+import copy
 
 logger = get_logger(__name__)
-
-def reproduce_3D():
-    u, v = get_uv()
-    rotation_mat = get_rotation()
-    translation_mat = get_translation()
-    inverse_E = construct_inverse_extrinsic(rotation_mat, translation_mat)
-    inverse_K = construct_inverse_intrinsic()
-    unproject(u, v, inverse_K, inverse_E)
 
 
         
@@ -50,15 +41,6 @@ def get_target_category_box(results:List,target_category_list:List[str],box_type
     return cat2id2box
 
 
-# def get_uv(boxes:List[ultralytics.engine.results.Boxes]):
-#     uv_list = []
-#     for box in boxes:
-#         fisrt_box = box[0]
-#         x = fisrt_box[0]
-#         y = fisrt_box[1]
-#         uv_list.append((int(x),int(y)))
-#         return  uv_list
-
 def get_uv(cat2id2box,category,id)->List[int]:
     if cat2id2box:
        return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1])
@@ -68,6 +50,7 @@ def get_box(cat2id2box,category,id):
     if cat2id2box:
         return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1]),int(cat2id2box[category][id][2]),int(cat2id2box[category][id][3])
     return -1,-1,-1,-1
+
 def get_annotated_image(results:List[ultralytics.engine.results.Results],label,x1,y1,x2,y2):
     if x1==-1 and x2==-1 and y1==-1 and y2 == -1:
         return []

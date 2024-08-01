@@ -1,6 +1,15 @@
 import numpy as np
 import math
 
+def quaternion_from_euler(roll, pitch, yaw):
+    """
+    将欧拉角 (roll, pitch, yaw) 转换为四元数 (qx, qy, qz, qw)
+    """
+    qx = math.sin(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) - math.cos(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
+    qy = math.cos(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2)
+    qz = math.cos(roll / 2) * math.cos(pitch / 2) * math.sin(yaw / 2) - math.sin(roll / 2) * math.sin(pitch / 2) * math.cos(yaw / 2)
+    qw = math.cos(roll / 2) * math.cos(pitch / 2) * math.cos(yaw / 2) + math.sin(roll / 2) * math.sin(pitch / 2) * math.sin(yaw / 2)
+    return [qx, qy, qz, qw]
 
 def construct_extrinsic(R, t):
     """
@@ -184,11 +193,3 @@ def construct_inverse_extrinsic_with_quaternion(quat,translation):
     # extrinsic_inverse = np.linalg.inv(extrinsic_matrix)
     return extrinsic_matrix
     
-
-def unproject_uv_list(uv_list,depth_list,intrinsic,extrinsic):
-    xyz_world = []
-    for uv,depth in zip(uv_list,depth_list):
-        u = uv[0]
-        v = uv[1]
-        xyz_world.append(unproject(u,v,depth,intrinsic,extrinsic)) 
-    return xyz_world
