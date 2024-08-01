@@ -1,6 +1,25 @@
 import numpy as np
 import math
 
+
+def quaternion_to_yaw(q_x, q_y, q_z, q_w):
+    """
+    将四元数转换为航向角（yaw）。
+    
+    参数:
+    q_x, q_y, q_z, q_w -- 四元数的四个分量
+    
+    返回值:
+    yaw -- 以弧度为单位的航向角
+    """
+    # 四元数转换为欧拉角（roll, pitch, yaw）
+    siny_cosp = 2 * (q_w * q_z + q_x * q_y)
+    cosy_cosp = 1 - 2 * (q_y * q_y + q_z * q_z)
+    yaw = math.atan2(siny_cosp, cosy_cosp)
+    
+    return yaw
+
+
 def quaternion_from_euler(roll, pitch, yaw):
     """
     将欧拉角 (roll, pitch, yaw) 转换为四元数 (qx, qy, qz, qw)

@@ -6,7 +6,7 @@ from pathlib import Path
 from ultralytics import YOLO
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
-from easyGL.transform import quaternion_from_euler
+from easyGL.transform import quaternion_from_euler,quaternion_to_yaw
 from typing import Tuple
 from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import Quaternion
@@ -44,9 +44,33 @@ previous_time:rospy.Time = None
 target_x=0
 target_y=0
 
+drone_yaw = 0
+current_yaw = 0
+
+
+
+def calculate_yaw(drone_pos, target_pos):
+    if len(drone_pos)<2 or len(target_pos)<2:
+        return 0 
+    
+    dx = target_pos[0] - drone_pos[0]
+    dy = target_pos[1] - drone_pos[1]
+
+    dist= math.sqrt(dx**2+ dy**2)
+    rospy.loginfo(f"dist: {dist}")
+
+    yaw = math.atan2(dy, dx)
+    
+    rospy.loginfo(f"dx{dx}")
+    rospy.loginfo(f"dy:{dy}")
+    rospy.loginfo(f"yaw:{yaw}")
+    rospy.loginfo(f"yaw_degree:{math.degrees(yaw)}")
+    rospy.loginfo("***********************************")
+    return  90-math.degrees(yaw)
+
 
 def pub_cmd(event):
-    client.moveToPositionAsync( target_y,target_x, -6, 4, 5 )
+    client.moveToPositionAsync( target_y,target_x, -6, 15, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
 
 
 def get_uv_depth(cv_depth:np.ndarray,u,v):
@@ -185,9 +209,20 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
 
                 # simple_track(t_array[0],t_array[1],unproject_world_x,unproject_world_y,6,4)
 
-                # global target_x,target_y
-                # target_x=unproject_world_x
-                # target_y=unproject_world_y
+                global target_x,target_y
+                target_x=world_point_ENU[0]
+                target_y=world_point_ENU[1]
+                drone_pos = np.array([odemetry_msg.pose.pose.position.x,odemetry_msg.pose.pose.position.y])
+               
+                global drone_yaw
+                # global current_yaw
+                # current_yaw = quaternion_to_yaw(*odemetry_msg.pose.pose.orientation)
+                rospy.loginfo(drone_yaw)
+                rospy.loginfo(drone_pos)
+                rospy.loginfo(np.array([target_x,target_y]))
+                rospy.loginfo("-----------------------------------------")
+                drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
+
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 
