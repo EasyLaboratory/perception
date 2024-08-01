@@ -15,7 +15,6 @@ import airsim
 import msgpackrpc.error
 from airsim import DrivetrainType
 import tf.transformations
-from trajectory_msgs.msg import TrajectoryPoint
 
 
 client = None
@@ -25,6 +24,7 @@ model_base_path = project_root/"models"
 model_path = model_base_path/"yolov10s_v1.pt"
 
 model:ultralytics.YOLO = YOLO(model_path)
+print(model_path)
 
 bridge = CvBridge()
 annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=9)
@@ -32,7 +32,6 @@ odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
 point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
 
-trajectory_point = TrajectoryPoint()
 
 
 K=[320.0, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]

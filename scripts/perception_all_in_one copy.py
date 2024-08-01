@@ -12,7 +12,6 @@ from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import Quaternion
 
 import tf.transformations
-from trajectory_msgs.msg import TrajectoryPoint
 
 
 current_dir = Path(__file__).resolve()
@@ -30,7 +29,6 @@ point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
 target_pub = rospy.Publisher('command/trajectory', TrajectoryPoint, queue_size=10)
 
-trajectory_point = TrajectoryPoint()
 
 
 
