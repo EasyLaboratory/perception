@@ -8,8 +8,4 @@ intr = construct_inverse_intrinsic(90,1920,1080)
 # res = unproject_uv_list(uv_list,intr,inverse_e)
 # print(res)
 
-
-a = {}
-cat = "c"
-a[cat] = {}
-print(a)
+print(np.full((3,),np.nan))

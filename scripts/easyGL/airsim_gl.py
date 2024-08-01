@@ -27,52 +27,72 @@ def track(model:ultralytics.YOLO,image:np.ndarray)->ultralytics.engine.results:
     return result
 
 
-def get_target_box(results:List,target_category_list:List[str],target_track_id_list:int)->Dict: 
+def get_target_category_box(results:List,target_category_list:List[str],box_type = "xywh")->Dict: 
     # {car:{1:[],2:[]}}
     cat2id2box = {}
     for result in results:
         box:ultralytics.engine.results.Boxes = result.boxes
+        if box.id is None:
+            return {}
         category = box.cls # 对象类别
         track_id = box.id # 跟踪 ID
         bbox = box.xywh  # 边界框信息
-        # print(track_id)
-        # print(category)
-        # print(bbox)
         if track_id is None:
             return {}
+        if box_type == "xywh":
+            bbox = box.xywh  # 边界框信息
+        elif box_type == "xyxy":
+            bbox = box.xyxy
+        else:
+            bbox = box.xywh
         if category in target_category_list:
-           cat2id2box[category.item()] = { entity.item():bbox for entity,bbox in zip(track_id,bbox)}
-        # print(cat2id2box)
+           cat2id2box[category.item()] = { entity.item():bbox.tolist() for entity,bbox in zip(track_id,bbox)}
     return cat2id2box
 
 
-def get_uv(boxes:List[ultralytics.engine.results.Boxes]):
-    uv_list = []
-    for box in boxes:
-        fisrt_box = box[0]
-        x = fisrt_box[0]
-        y = fisrt_box[1]
-        uv_list.append((int(x),int(y)))
-        return  uv_list
+# def get_uv(boxes:List[ultralytics.engine.results.Boxes]):
+#     uv_list = []
+#     for box in boxes:
+#         fisrt_box = box[0]
+#         x = fisrt_box[0]
+#         y = fisrt_box[1]
+#         uv_list.append((int(x),int(y)))
+#         return  uv_list
+
+def get_uv(cat2id2box,category,id)->List[int]:
+    if cat2id2box:
+       return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1])
+    return []
+
+def get_box(cat2id2box,category,id):
+    if cat2id2box:
+        return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1]),int(cat2id2box[category][id][2]),int(cat2id2box[category][id][3])
+    return -1,-1,-1,-1
+def get_annotated_image(results:List[ultralytics.engine.results.Results],label,x1,y1,x2,y2):
+    if x1==-1 and x2==-1 and y1==-1 and y2 == -1:
+        return []
+    annotated_image:List = []
+    for result in results:
+        center_point_x = int((x1+x2)/2)
+        center_point_y = int((y1+y2)/2)
+        temp = copy.deepcopy(result.orig_img)
+        temp = cv2.rectangle(temp, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        temp = cv2.putText(temp, str(label), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        temp = cv2.circle(temp, (center_point_x, center_point_y), radius=20, color=(255, 0, 0), thickness=-1)  # 使用蓝色圆点标记
+        annotated_image.append(temp)
+    return annotated_image
 
 
-def get_annotated_frame(result:ultralytics.engine.results.Results,box_list:List[ultralytics.engine.results.Boxes],uv_list):
-    temp = copy.deepcopy(result.orig_img)
-    for box,uv in zip(box_list,uv_list):
-        rospy.loginfo(box)
-        rospy.loginfo(uv)
-        rospy.loginfo("-----------------------")
-        # xyxy = box[0].xyx
-        # first_box = xyxy[0]
-        # x1, y1, x2, y2 = first_box[0], first_box[1], first_box[2], first_box[3]
-        # x1 = int(round(x1.item()))
-        # y1 = int(round(y1.item()))
-        # x2 = int(round(x2.item()))
-        # y2 = int(round(y2.item()))
-        # temp = cv2.rectangle(result_temp.orig_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        # temp = cv2.putText(temp, label_key, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
-        temp = cv2.circle(temp, (uv[0], uv[1]), radius=20, color=(255, 0, 0), thickness=-1)  # 使用蓝色圆点标记
-    return temp
+def get_annotated_image_center(results:List[ultralytics.engine.results.Results],label,x,y):
+    if x == -1 and y == -1:
+        return []
+    
+    annotated_image:List = []
+    for result in results:
+        temp = copy.deepcopy(result.orig_img)
+        temp = cv2.circle(temp, (x, y), radius=20, color=(255, 0, 0), thickness=-1)  # 使用蓝色圆点标记
+        annotated_image.append(temp)
+    return annotated_image
 
 
 

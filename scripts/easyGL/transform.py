@@ -52,6 +52,8 @@ def construct_intrinsic(fov: float, width: int, height: int, is_degree=True):
     """
     if is_degree:
         fov = fov * (math.pi / 180)
+    
+
     fx = width / (2 * math.tan(fov / 2) + 0.1)
     fy = height / (2 * math.tan(fov / 2) + 0.1)
     cx = width / 2
@@ -63,6 +65,7 @@ def construct_intrinsic(fov: float, width: int, height: int, is_degree=True):
 def construct_inverse_intrinsic(fov: float, width: int, height: int, is_degree=True):
     if is_degree:
         fov = fov * (math.pi / 180)
+
     fx = width / (2 * math.tan(fov / 2) + 0.1)
     fy = height / (2 * math.tan(fov / 2) + 0.1)
     cx = width / 2
@@ -70,6 +73,19 @@ def construct_inverse_intrinsic(fov: float, width: int, height: int, is_degree=T
     k_inv = np.array([[1 / fx, 0, -cx / fx],
                       [0, 1 / fy, -cy / fy],
                       [0, 0, 1]])
+    return k_inv
+
+def construct_inverse_intrinsic_with_k(K):
+    fx = K[0]
+    fy = K[4]
+    cx = K[2]
+    cy = K[5]
+    
+    k_inv = np.array([
+        [1 / fx, 0, -cx / fx],
+        [0, 1 / fy, -cy / fy],
+        [0, 0, 1]
+    ])
     return k_inv
 
 
@@ -106,7 +122,7 @@ def rotation_z(theta):
     ])
 
 
-def unproject(u, v, depth,inverse_K, inverse_E):
+def unproject(u, v, depth,inverse_K, inverse_E)->np.ndarray:
     """
     unproject the u,v point 
     1. camera uv to camera xyz
@@ -123,16 +139,26 @@ def unproject(u, v, depth,inverse_K, inverse_E):
     mav_xyz = camera2mav(camera_xyz)
     homo_mav_xyz = np.append(mav_xyz, 1)
     homo_word_xyz = inverse_E @ homo_mav_xyz
-    return homo_word_xyz[0],homo_mav_xyz[1],homo_word_xyz[2]
+    return homo_word_xyz[0:3]
 
 
 def camera2mav(point_camera):
-    camera2mav = np.array([[0, 0, 1],
-                            [1, 0, 0],
-                            [0, 1, 0]])
     
-    return camera2mav@point_camera
+    ## enu camera
+    camera2mav = np.array([[1, 0, 0],
+                            [0, 0, 1],
+                            [0, -1, 0]])
+    
+    # camera2mav = np.array([[0, 0, 1],
+    #                         [1, 0, 0],
+    #                         [0, 1, 0]])
+    
+    # test_rot =    np.array([[0, 1, 0],
+    #                         [-1, 0, 0],
+    #                         [0, 0, -1]])
+    
 
+    return camera2mav@point_camera
 
 def quaternion_to_rotation_matrix(quat):
     w, x, y, z = quat

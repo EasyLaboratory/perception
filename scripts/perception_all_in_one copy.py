@@ -196,7 +196,7 @@ def sensor_perception():
     depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
 
     # drone odemetry
-    odom_local_ned = "odom_local_ned"
+    odom_local_ned = "odom_local_ne"
     odemetry_topic = f"/airsim_node/{vehicle_name}/{odom_local_ned}"
 
     rgb_sub = Subscriber(rgb_topic,Image)
