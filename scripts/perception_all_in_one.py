@@ -1,3 +1,6 @@
+#!/home/rich/easyLab/src/perception/yolo_venv/bin/python3.8
+
+
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge,CvBridgeError
@@ -23,7 +26,6 @@ model_base_path = project_root/"models"
 model_path = model_base_path/"yolov10s_v1.pt"
 
 model:ultralytics.YOLO = YOLO(model_path)
-print(model_path)
 
 bridge = CvBridge()
 annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=9)
@@ -81,16 +83,13 @@ def construct_point_msg_array(point):
     return point_msg
 
 
-def connect2client():
+def connect2client(ip):
     global client
     if client is not None:
         rospy.logwarn("the client already exists")
-    client = airsim.MultirotorClient()
-    try:
-        client.confirmConnection()
-        client.enableApiControl(True)
-    except msgpackrpc.error.TransportError:
-        rospy.logerr("can not connect the client")
+    client = airsim.MultirotorClient(ip=ip)
+    client.confirmConnection()
+    client.enableApiControl(True)
     rospy.loginfo("init the client")
 
 
@@ -237,14 +236,15 @@ signal.signal(signal.SIGINT, signal_handler)
 
 
 def sensor_perception():
-    global client
-    connect2client()
+   
+    rospy.init_node('perception_node', anonymous=True)
+
+    remote_ip = rospy.get_param("~remote_ip","127.0.0.1")
+    connect2client(remote_ip)
     client.armDisarm(True)
     client.takeoffAsync().join()
     client.moveToPositionAsync(0, 0, -6, 3).join()
     client.hoverAsync().join()
-
-    rospy.init_node('airsim_image_subscriber', anonymous=True)
     
     # rgb image in camera_1
     vehicle_name = rospy.get_param("/vehicle_name", "drone_1")
@@ -270,6 +270,9 @@ def sensor_perception():
     ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=10, slop=0.25)
     ats.registerCallback(perception_callback)
     rospy.spin()
+
+
+
 
 if __name__ == "__main__":
     sensor_perception()

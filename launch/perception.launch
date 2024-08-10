@@ -1,10 +1,6 @@
 <launch>
-    <!-- 启动perception节点 -->
-    <arg name="venv" value="$(find perception)/yolo_venv/bin/python3"/>
-    <!-- <node name="perception_node" pkg="perception" type="perception.py" output="screen" launch-prefix = "$(arg venv)" >
-    </node> -->
-    <node name="perception_node" pkg="perception" type="perception_all_in_one.py" output="screen" launch-prefix = "$(arg venv)" >
+    <arg name="remote_ip" default="127.0.0.1"/>
+    <node name="perception_node" pkg="perception" type="perception_all_in_one.py" output="screen">
+        <param name="remote_ip" value="$(arg remote_ip)"/>
     </node>
 </launch>
-
-
