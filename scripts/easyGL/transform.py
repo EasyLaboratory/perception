@@ -2,6 +2,12 @@ import numpy as np
 import math
 
 
+class Eular_angle:
+    def __init__(self,pitch,roll,yaw) -> None:
+        self.pitch = pitch
+        self.roll = roll
+        self.yaw = yaw
+
 def quaternion_to_yaw(q_x, q_y, q_z, q_w):
     """
     将四元数转换为航向角（yaw）。
@@ -170,23 +176,32 @@ def unproject(u, v, depth,inverse_K, inverse_E)->np.ndarray:
     return homo_word_xyz[0:3]
 
 
-def camera2mav(point_camera):
+def camera2mav(camera_xyz,camera_rotation:Eular_angle=[],camera_translation=[]):
+    """
+    transform the camera_xyz to mav_xyz
+    1. rotation yaw->pitch->roll
+    2. tanslate the position
+    3. camera coords to mav coords
+    """
+    homo_camera_xyz = np.append(camera_xyz,1)
+    
     
     ## enu camera
-    camera2mav = np.array([[1, 0, 0],
+    camera2mav_coords = np.array([[1, 0, 0],
                             [0, 0, 1],
                             [0, -1, 0]])
     
-    # camera2mav = np.array([[0, 0, 1],
-    #                         [1, 0, 0],
-    #                         [0, 1, 0]])
-    
-    # test_rot =    np.array([[0, 1, 0],
-    #                         [-1, 0, 0],
-    #                         [0, 0, -1]])
-    
+    # rotation_x_mat = rotation_x(pi)
+    # rotation_y_mat = rotation_y(roll)
+    # rotation_z_mat = rotation_z(yaw)
 
-    return camera2mav@point_camera
+    R = rotation_z_mat@rotation_y_mat@rotation_x_mat
+    R_T_mat = np.eye(4)
+    R_T_mat[:3,:3] = R
+    R_T_mat[:3,3] = camera_translation
+
+    camera_xyz = R_T_mat@homo_camera_xyz[:3]
+    return camera2mav_coords@camera_xyz
 
 def quaternion_to_rotation_matrix(quat):
     w, x, y, z = quat

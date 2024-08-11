@@ -10,13 +10,9 @@ from ultralytics import YOLO
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
 from easyGL.transform import quaternion_from_euler,quaternion_to_yaw
-from typing import Tuple
 from geometry_msgs.msg import PointStamped
-from geometry_msgs.msg import Quaternion
 import signal
 import airsim
-import msgpackrpc.error
-from airsim import DrivetrainType
 
 
 client = None
@@ -62,17 +58,12 @@ def calculate_yaw(drone_pos, target_pos):
     rospy.loginfo(f"dist: {dist}")
 
     yaw = math.atan2(dy, dx)
-    
-    rospy.loginfo(f"dx{dx}")
-    rospy.loginfo(f"dy:{dy}")
-    rospy.loginfo(f"yaw:{yaw}")
-    rospy.loginfo(f"yaw_degree:{math.degrees(yaw)}")
-    rospy.loginfo("***********************************")
+
     return  90-math.degrees(yaw)
 
 
 def pub_cmd(event):
-    client.moveToPositionAsync( target_y,target_x, -6, 15, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
+    client.moveToPositionAsync(target_y,target_x, -6, 10, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
 
 
 def get_uv_depth(cv_depth:np.ndarray,u,v):
@@ -146,7 +137,6 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
         # Convert the ROS Image message to a format OpenCV can work with
         cv_image = bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='passthrough')
         results=track(model,cv_image)
-        rospy.loginfo(len(results))
         if len(results) == 1:
             cat2id2_xywhbox = get_target_category_box(results,[0])
             x,y,w,h = get_box(cat2id2_xywhbox,0,1)
@@ -206,7 +196,6 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
 
                 odom_publisher.publish(odo_msg)
 
-                # simple_track(t_array[0],t_array[1],unproject_world_x,unproject_world_y,6,4)
 
                 global target_x,target_y
                 target_x=world_point_ENU[0]
@@ -214,12 +203,6 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
                 drone_pos = np.array([odemetry_msg.pose.pose.position.x,odemetry_msg.pose.pose.position.y])
                
                 global drone_yaw
-                # global current_yaw
-                # current_yaw = quaternion_to_yaw(*odemetry_msg.pose.pose.orientation)
-                rospy.loginfo(drone_yaw)
-                rospy.loginfo(drone_pos)
-                rospy.loginfo(np.array([target_x,target_y]))
-                rospy.loginfo("-----------------------------------------")
                 drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
 
     except CvBridgeError as e:
@@ -245,6 +228,8 @@ def sensor_perception():
     client.takeoffAsync().join()
     client.moveToPositionAsync(0, 0, -6, 3).join()
     client.hoverAsync().join()
+    rospy.loginfo("take off succ")
+    rospy.loginfo("take off")
     
     # rgb image in camera_1
     vehicle_name = rospy.get_param("/vehicle_name", "drone_1")
@@ -267,7 +252,11 @@ def sensor_perception():
 
     rospy.Timer(rospy.Duration(0.1), pub_cmd)
 
-    ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=10, slop=0.25)
+    ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=20, slop=0.1)
+    rospy.loginfo("publish call back")
+    rospy.loginfo(rgb_topic)
+    rospy.loginfo(depth_topic)
+    rospy.loginfo(odemetry_topic)
     ats.registerCallback(perception_callback)
     rospy.spin()
 
