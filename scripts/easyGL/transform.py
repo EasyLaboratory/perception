@@ -8,6 +8,12 @@ class Eular_angle:
         self.roll = roll
         self.yaw = yaw
 
+class Translation:
+    def __init__(self,x,y,z) -> None:
+        self.x = x
+        self.y = y
+        self.z = z
+
 def quaternion_to_yaw(q_x, q_y, q_z, q_w):
     """
     将四元数转换为航向角（yaw）。
@@ -156,7 +162,8 @@ def rotation_z(theta):
     ])
 
 
-def unproject(u, v, depth,inverse_K, inverse_E)->np.ndarray:
+def unproject(u, v, depth,inverse_K, inverse_E,camera_eular:Eular_angle,
+              camera_translation:Translation)->np.ndarray:
     """
     unproject the u,v point 
     1. camera uv to camera xyz
@@ -170,13 +177,13 @@ def unproject(u, v, depth,inverse_K, inverse_E)->np.ndarray:
     camera_xyz = camera_xyz*depth
 
     # step2
-    mav_xyz = camera2mav(camera_xyz)
+    mav_xyz = camera2mav(camera_xyz,camera_eular,camera_translation)
     homo_mav_xyz = np.append(mav_xyz, 1)
     homo_word_xyz = inverse_E @ homo_mav_xyz
     return homo_word_xyz[0:3]
 
 
-def camera2mav(camera_xyz,camera_rotation:Eular_angle=[],camera_translation=[]):
+def camera2mav(camera_xyz,camera_rotation:Eular_angle,camera_translation):
     """
     transform the camera_xyz to mav_xyz
     1. rotation yaw->pitch->roll
@@ -191,16 +198,16 @@ def camera2mav(camera_xyz,camera_rotation:Eular_angle=[],camera_translation=[]):
                             [0, 0, 1],
                             [0, -1, 0]])
     
-    # rotation_x_mat = rotation_x(pi)
-    # rotation_y_mat = rotation_y(roll)
-    # rotation_z_mat = rotation_z(yaw)
+    rotation_x_mat = rotation_x(camera_rotation.pitch)
+    rotation_y_mat = rotation_y(roll)
+    rotation_z_mat = rotation_z(yaw)
 
-    R = rotation_z_mat@rotation_y_mat@rotation_x_mat
-    R_T_mat = np.eye(4)
-    R_T_mat[:3,:3] = R
-    R_T_mat[:3,3] = camera_translation
+    # R = rotation_z_mat@rotation_y_mat@rotation_x_mat
+    # R_T_mat = np.eye(4)
+    # R_T_mat[:3,:3] = R
+    # R_T_mat[:3,3] = camera_translation
 
-    camera_xyz = R_T_mat@homo_camera_xyz[:3]
+    # camera_xyz = R_T_mat@homo_camera_xyz[:3]
     return camera2mav_coords@camera_xyz
 
 def quaternion_to_rotation_matrix(quat):
@@ -224,6 +231,6 @@ def construct_inverse_extrinsic_with_quaternion(quat,translation):
     extrinsic_matrix[:3, :3] = rotation
     extrinsic_matrix[:3, 3] = translation
 
-    # extrinsic_inverse = np.linalg.inv(extrinsic_matrix)
-    return extrinsic_matrix
+    extrinsic_inverse = np.linalg.inv(extrinsic_matrix)
+    return extrinsic_inverse
     

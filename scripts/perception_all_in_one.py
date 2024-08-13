@@ -28,7 +28,8 @@ annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=
 odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
 point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
-
+camera_eular_angle = Eular_angle(pitch=-30,roll=0,yaw=0)
+camera_translation = Translation(x=0.5,y=0,z=0)
 
 
 K=[320.0, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]
