@@ -4,15 +4,31 @@ import math
 
 class Eular_angle:
     def __init__(self,pitch,roll,yaw) -> None:
+        """
+        The given eular angle is under NED coords. 
+        """
         self.pitch = pitch
         self.roll = roll
         self.yaw = yaw
+    
+    @property
+    def ENU_pitch_rad(self):
+        return np.deg2rad(self.pitch)
+    @property
+    def ENU_roll_rad(self):
+        return np.deg2rad(-self.yaw)
+    @property
+    def ENU_yaw_rad(self):
+        return np.deg2rad(self.roll)
 
 class Translation:
     def __init__(self,x,y,z) -> None:
         self.x = x
         self.y = y
         self.z = z
+    
+    def get_xyz(self):
+        return np.array([self.x,self.y,self.z])
 
 def quaternion_to_yaw(q_x, q_y, q_z, q_w):
     """
@@ -162,53 +178,85 @@ def rotation_z(theta):
     ])
 
 
-def unproject(u, v, depth,inverse_K, inverse_E,camera_eular:Eular_angle,
-              camera_translation:Translation)->np.ndarray:
-    """
-    unproject the u,v point 
-    1. camera uv to camera xyz
-    2. camera xyz to NED
-    3. NED xyz to world xyz
-    """
+# def unproject(u, v, depth,inverse_K, inverse_E,camera_eular:Eular_angle,
+#               camera_translation:Translation)->np.ndarray:
+#     """
+#     unproject the u,v point 
+#     1. camera uv to camera xyz
+#     2. camera xyz to NED
+#     3. NED xyz to world xyz
+#     """
 
-    # step1
+#     # step1
+#     homo_uv = np.array([u, v, 1])
+#     camera_xyz = inverse_K @ homo_uv
+#     camera_xyz = camera_xyz*depth
+
+#     # step2
+#     mav_xyz = camera2mav(camera_xyz,camera_eular,camera_translation)
+#     homo_mav_xyz = np.append(mav_xyz, 1)
+#     homo_word_xyz = inverse_E @ homo_mav_xyz
+#     return homo_word_xyz[0:3]
+
+def unproject(u, v, depth,inverse_camera_K,camera_eular:Eular_angle,
+              camera_translation:Translation,inverse_air_E)->np.ndarray:
+    camera_xyz = camera2D2camera3D(u,v,depth,inverse_camera_K)
+    mav_xyz = camera2mavENU(camera_xyz,camera_eular,camera_translation)
+    return mavENU2worldENU(mav_xyz,inverse_air_E)
+
+
+def camera2D2camera3D(u,v,depth,inverse_camera_K):
     homo_uv = np.array([u, v, 1])
-    camera_xyz = inverse_K @ homo_uv
+    camera_xyz = inverse_camera_K @ homo_uv
     camera_xyz = camera_xyz*depth
+    return camera_xyz
 
-    # step2
-    mav_xyz = camera2mav(camera_xyz,camera_eular,camera_translation)
-    homo_mav_xyz = np.append(mav_xyz, 1)
-    homo_word_xyz = inverse_E @ homo_mav_xyz
-    return homo_word_xyz[0:3]
-
-
-def camera2mav(camera_xyz,camera_rotation:Eular_angle,camera_translation):
+def camera2mavENU(camera_xyz,camera_eular:Eular_angle,
+              camera_translation:Translation):
     """
-    transform the camera_xyz to mav_xyz
-    1. rotation yaw->pitch->roll
-    2. tanslate the position
-    3. camera coords to mav coords
+    Convert from the camera coordinate system to ENU coordsystem 
     """
-    homo_camera_xyz = np.append(camera_xyz,1)
-    
-    
-    ## enu camera
-    camera2mav_coords = np.array([[1, 0, 0],
+    camera_coord2camera_ENU = np.array([[1, 0, 0],
                             [0, 0, 1],
                             [0, -1, 0]])
+    camera_xyz = camera_coord2camera_ENU@camera_xyz
+    r_yaw = np.array([
+        [np.cos(camera_eular.ENU_yaw_rad), -np.sin(camera_eular.ENU_yaw_rad), 0],
+        [np.sin(camera_eular.ENU_yaw_rad), np.cos(camera_eular.ENU_yaw_rad), 0],
+        [0, 0, 1]
+    ])
+
+    r_pitch = np.array([
+        [1, 0, 0],
+        [0, np.cos(camera_eular.ENU_pitch_rad), -np.sin(camera_eular.ENU_pitch_rad)],
+        [0, np.sin(camera_eular.ENU_pitch_rad), np.cos(camera_eular.ENU_pitch_rad)]
+    ])
     
-    rotation_x_mat = rotation_x(camera_rotation.pitch)
-    rotation_y_mat = rotation_y(roll)
-    rotation_z_mat = rotation_z(yaw)
+    r_roll =   np.array([
+        [np.cos(camera_eular.ENU_roll_rad), 0, np.sin(camera_eular.ENU_roll_rad)],
+        [0, 1, 0],
+        [-np.sin(camera_eular.ENU_roll_rad), 0, np.cos(camera_eular.ENU_roll_rad)]
+    ])
+    
+    NED2ENU = np.array([
+        [1,0,0],
+        [0,1,0],
+        [0,0,-1]])
+    
+    ENU_translation = NED2ENU@camera_translation.get_xyz()
 
-    # R = rotation_z_mat@rotation_y_mat@rotation_x_mat
-    # R_T_mat = np.eye(4)
-    # R_T_mat[:3,:3] = R
-    # R_T_mat[:3,3] = camera_translation
+    extrinsic_matrix = np.eye(4)
+    extrinsic_matrix[:3, :3] = r_roll@r_pitch@r_yaw
+    extrinsic_matrix[:3, 3] = ENU_translation
 
-    # camera_xyz = R_T_mat@homo_camera_xyz[:3]
-    return camera2mav_coords@camera_xyz
+    homo_camera_xyz = np.append(camera_xyz,1)
+    mav_point = extrinsic_matrix@homo_camera_xyz
+    return mav_point[:3]
+
+def mavENU2worldENU(mav_xyz,inverse_air_E):
+    homo_mav_xyz = np.append(mav_xyz, 1)
+    homo_word_xyz = inverse_air_E @ homo_mav_xyz
+    return homo_word_xyz[0:3]
 
 def quaternion_to_rotation_matrix(quat):
     w, x, y, z = quat
@@ -218,7 +266,7 @@ def quaternion_to_rotation_matrix(quat):
         [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x**2 - 2*y**2]
     ])
 
-def construct_inverse_extrinsic_with_quaternion(quat,translation):
+def construct_extrinsic_with_quaternion(quat,translation):
     w, x, y, z = quat
     
     rotation = np.array([
@@ -231,6 +279,5 @@ def construct_inverse_extrinsic_with_quaternion(quat,translation):
     extrinsic_matrix[:3, :3] = rotation
     extrinsic_matrix[:3, 3] = translation
 
-    extrinsic_inverse = np.linalg.inv(extrinsic_matrix)
-    return extrinsic_inverse
+    return extrinsic_matrix
     

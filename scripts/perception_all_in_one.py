@@ -9,7 +9,7 @@ from pathlib import Path
 from ultralytics import YOLO
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
-from easyGL.transform import quaternion_from_euler,quaternion_to_yaw
+from easyGL.transform import quaternion_from_euler,Eular_angle
 from geometry_msgs.msg import PointStamped
 import signal
 import airsim
@@ -34,7 +34,10 @@ camera_translation = Translation(x=0.5,y=0,z=0)
 
 K=[320.0, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]
 
-intrinsic_matrix = construct_inverse_intrinsic_with_k(K)
+camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(K)
+
+camera_Eular = Eular_angle(pitch=30,roll=0,yaw=0)
+cameara_translation = Translation(x=0.5,y=0,z=0)
 
 previous_position = None
 previous_time:rospy.Time = None
@@ -102,29 +105,6 @@ def get_linear_velocity(current_position,current_time:rospy.Time):
     else:
         return np.full((3,),np.nan)
     
-        
-def simple_track(curr_x, curr_y, tar_x, tar_y, tar_z, v):
-    global client
-
-    rospy.loginfo("-------------------------------------------------")
-
-    # 计算方向向量
-    # direction_x = tar_x - curr_x
-    # direction_y = tar_y - curr_y
-
-    # # 计算方向向量的长度
-    # length = (direction_x**2 + direction_y**2 )**0.5
-
-    # # 归一化方向向量
-    # unit_direction_x = direction_x / length
-    # unit_direction_y = direction_y / length
-
-    # # 计算新的目标位置
-    # new_x = curr_x + unit_direction_x * 10
-    # new_y = curr_y + unit_direction_y * 10
-
-    # 移动到新的目标位置
-    client.moveToPositionAsync( tar_y,tar_x,-tar_z, v,5).join()
 
         
 
@@ -161,8 +141,8 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
                 t_array = np.array([t.x,t.y,t.z])
                 o = odemetry_msg.pose.pose.orientation
                 o_array = np.array([o.w,o.x,o.y,o.z])
-                extrinsic_matrix = construct_inverse_extrinsic_with_quaternion(o_array,t_array)
-                world_point_ENU =unproject(x,y,depth,intrinsic_matrix,extrinsic_matrix)
+                extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
+                world_point_ENU =unproject(x,y,depth,camera_intrinsic_matrix,camera_eular_angle,camera_translation,extrinsic_matrix)
 
                 res_point = PointStamped()
                 res_point.header.stamp = odemetry_msg.header.stamp
@@ -205,7 +185,9 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
                
                 global drone_yaw
                 drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
-
+        rospy.loginfo("-----------------------------------------------------")
+        rospy.loginfo(target_x)
+        rospy.loginfo(target_y)
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 
@@ -254,10 +236,6 @@ def sensor_perception():
     rospy.Timer(rospy.Duration(0.1), pub_cmd)
 
     ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=20, slop=0.1)
-    rospy.loginfo("publish call back")
-    rospy.loginfo(rgb_topic)
-    rospy.loginfo(depth_topic)
-    rospy.loginfo(odemetry_topic)
     ats.registerCallback(perception_callback)
     rospy.spin()
 
