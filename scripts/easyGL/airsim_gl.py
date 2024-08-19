@@ -83,7 +83,7 @@ def add_noise(depth_map, theta_y):
     根据已知噪声模型对超出理想范围的深度图进行去噪处理
     :param depth_map: 原始深度图，单位为米，numpy数组
     :param theta_y: 入射角度，单位为弧度，numpy数组，与depth_map形状相同
-    :return: 去噪后的深度图
+    :return: 添加噪声的深度图
     """
     # 噪声模型参数
     a0 = 0.001063
