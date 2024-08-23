@@ -61,7 +61,7 @@ class AirSimImagePublisher:
         # 获取RGB图像和深度图像
         responses = self.client.simGetImages([
             airsim.ImageRequest("camera_1", airsim.ImageType.Scene, False, False),
-            airsim.ImageRequest("camera_1", airsim.ImageType.DepthPlanar, True, False),
+            airsim.ImageRequest("camera_2", airsim.ImageType.DepthPlanar, True, False),
         ])
 
         rgb_response = responses[0]

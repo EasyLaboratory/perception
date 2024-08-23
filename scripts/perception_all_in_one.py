@@ -32,7 +32,8 @@ camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
 camera_translation = Translation(x=0.5,y=0,z=0)
 
 
-K=[320.0, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]
+K=[640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
+
 
 camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(K)
 
@@ -68,6 +69,8 @@ def pub_cmd(event):
 
 
 def get_uv_depth(cv_depth:np.ndarray,u,v):
+    rospy.loginfo("----------------------------------")
+    rospy.loginfo(cv_depth.shape)
     return cv_depth[v][u]
 
 def construct_point_msg_array(point):
