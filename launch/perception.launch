@@ -5,9 +5,19 @@
     </node>
 </launch> -->
 
-<launch>
+<!-- <launch>
     <arg name="remote_ip" default="127.0.0.1"/>
     <arg name="venv" value="$(find perception)/yolo_venv/bin/python3"/>
+    <node name="perception_node" pkg="perception" type="perception_all_in_one.py" output="screen" launch-prefix = "$(arg venv)" >
+        <param name="remote_ip" value="$(arg remote_ip)"/>
+    </node>
+</launch> -->
+
+<launch>
+    <arg name="venv" value="$(find perception)/yolo_venv/bin/python3"/>
+    <node name="airsim_wrapper_node" pkg="perception" type="airsim_ros_wrapper.py" output="screen" launch-prefix = "$(arg venv)" >
+    </node>
+    <arg name="remote_ip" default="127.0.0.1"/>
     <node name="perception_node" pkg="perception" type="perception_all_in_one.py" output="screen" launch-prefix = "$(arg venv)" >
         <param name="remote_ip" value="$(arg remote_ip)"/>
     </node>

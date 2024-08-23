@@ -1,6 +1,5 @@
 #!/home/rich/easyLab/src/perception/yolo_venv/bin/python3.8
 
-
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge,CvBridgeError
@@ -13,6 +12,7 @@ from easyGL.transform import quaternion_from_euler,Eular_angle
 from geometry_msgs.msg import PointStamped
 import signal
 import airsim
+from perception_msgs.msg import SyncedImg
 
 
 client = None
@@ -28,16 +28,13 @@ annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=
 odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
 point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
-camera_eular_angle = Eular_angle(pitch=-30,roll=0,yaw=0)
+camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
 camera_translation = Translation(x=0.5,y=0,z=0)
 
 
 K=[320.0, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]
 
 camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(K)
-
-camera_Eular = Eular_angle(pitch=30,roll=0,yaw=0)
-cameara_translation = Translation(x=0.5,y=0,z=0)
 
 previous_position = None
 previous_time:rospy.Time = None
@@ -110,13 +107,13 @@ def get_linear_velocity(current_position,current_time:rospy.Time):
 
 
 
-def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
+def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
     global annotated_frame_publisher
     global bridge
     global model
     try:
         # Convert the ROS Image message to a format OpenCV can work with
-        cv_image = bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='passthrough')
+        cv_image = bridge.imgmsg_to_cv2(synced_msg.rgb_image, desired_encoding='passthrough')
         results=track(model,cv_image)
         if len(results) == 1:
             cat2id2_xywhbox = get_target_category_box(results,[0])
@@ -135,7 +132,7 @@ def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
             
 
             if x!=-1 and y!=-1:
-                cv_depth = bridge.imgmsg_to_cv2(depth_msg,desired_encoding="passthrough")
+                cv_depth = bridge.imgmsg_to_cv2(synced_msg.depth_image,desired_encoding="passthrough")
                 depth = get_uv_depth(cv_depth,x,y)
                 t = odemetry_msg.pose.pose.position
                 t_array = np.array([t.x,t.y,t.z])
@@ -214,28 +211,30 @@ def sensor_perception():
     rospy.loginfo("take off succ")
     rospy.loginfo("take off")
     
-    # rgb image in camera_1
+    # # rgb image in camera_1
     vehicle_name = rospy.get_param("/vehicle_name", "drone_1")
-    rgb_camera = "camera_1"
-    camera_type_scene = "Scene"
-    rgb_topic = f"/airsim_node/{vehicle_name}/{rgb_camera}/{camera_type_scene}"
+    # rgb_camera = "camera_1"
+    # camera_type_scene = "Scene"
+    # rgb_topic = f"/airsim_node/{vehicle_name}/{rgb_camera}/{camera_type_scene}"
 
-    # depth image in camera_2
-    depth_camera = "camera_2"
-    camera_type_depth = "DepthPlanar"
-    depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
+    # # depth image in camera_2
+    # depth_camera = "camera_2"
+    # camera_type_depth = "DepthPlanar"
+    # depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
+
+    # camera_topic 
+    camera_topic  = '/airsim/synced_image'
 
     # drone odemetry
     odom_local_enu = "odom_local_enu"
     odemetry_topic = f"/airsim_node/{vehicle_name}/{odom_local_enu}"
 
-    rgb_sub = Subscriber(rgb_topic,Image)
-    depth_sub = Subscriber(depth_topic,Image)
+    camera_sub = Subscriber(camera_topic,SyncedImg)
     odemetry_sub = Subscriber(odemetry_topic,Odometry)
 
-    rospy.Timer(rospy.Duration(0.1), pub_cmd)
+    # rospy.Timer(rospy.Duration(0.1), pub_cmd)
 
-    ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=20, slop=0.1)
+    ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.01)
     ats.registerCallback(perception_callback)
     rospy.spin()
 
