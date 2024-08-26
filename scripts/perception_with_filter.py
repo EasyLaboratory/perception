@@ -1,5 +1,3 @@
-#!/home/rich/easyLab/src/perception/yolo_venv/bin/python3.8
-
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge,CvBridgeError
@@ -8,11 +6,13 @@ from pathlib import Path
 from ultralytics import YOLO
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
-from easyGL.transform import quaternion_from_euler,Eular_angle
+from easyGL.transform import quaternion_from_euler,quaternion_to_yaw
+from typing import Tuple
 from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import Quaternion
 import signal
 import airsim
-from perception_msgs.msg import SyncedImg
+from enum import Enum
 
 
 client = None
@@ -28,16 +28,15 @@ annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=
 odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
 point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
-camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
-camera_translation = Translation(x=0.5,y=0,z=0)
 
 
-K=[640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
 
+K=[320.0, 0.0, 320.0, 0.0, 320.0, 240.0, 0.0, 0.0, 1.0]
 
-camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(K)
+intrinsic_matrix = construct_inverse_intrinsic_with_k(K)
 
 previous_position = None
+previous_velocity = None
 previous_time:rospy.Time = None
 
 
@@ -47,6 +46,23 @@ target_y=0
 drone_yaw = 0
 current_yaw = 0
 
+class SequnceState(Enum):
+    FIRST_POSITION = 1
+    FIRST_VELOCITY = 2
+    OUTLIER = 3
+    NORMAL = 4
+
+def expire_previous_position_velocity(current_time):
+    global previous_position
+    global previous_velocity
+    global previous_time
+    if previous_time is None:
+       return
+    elif (current_time - previous_time).to_sec() > 2:
+        previous_position = None
+        previous_velocity = None
+        previous_time = None
+    
 
 
 def calculate_yaw(drone_pos, target_pos):
@@ -55,26 +71,16 @@ def calculate_yaw(drone_pos, target_pos):
     
     dx = target_pos[0] - drone_pos[0]
     dy = target_pos[1] - drone_pos[1]
-
-    dist= math.sqrt(dx**2+ dy**2)
-    rospy.loginfo(f"dist: {dist}")
-
     yaw = math.atan2(dy, dx)
-
     return  90-math.degrees(yaw)
 
 
 def pub_cmd(event):
-    client.moveToPositionAsync(target_y,target_x, -6, 10, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
+    client.moveToPositionAsync( target_y,target_x, -6, 15, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
 
 
 def get_uv_depth(cv_depth:np.ndarray,u,v):
     return cv_depth[v][u]
-
-def construct_point_msg_array(point):
-    point_msg = PointStamped(point[0],point[1],point[2])
-    return point_msg
-
 
 def connect2client(ip):
     global client
@@ -86,14 +92,38 @@ def connect2client(ip):
     rospy.loginfo("init the client")
 
 
-def get_linear_velocity(current_position,current_time:rospy.Time):
+def is_outlier(current_position,current_time:rospy.Time,threshold):
     global previous_position
+    global previous_velocity
     global previous_time
     if previous_position is None and current_position is not None:
         previous_position = current_position
-        previous_time = rospy.Time.now()
-        return np.full((3,),np.nan)
-    elif previous_position is not None and previous_time is not None:
+        previous_time = current_time
+        return SequnceState.FIRST_POSITION
+    elif previous_position is not None and previous_velocity is None:
+        time_diff = (current_time-previous_time).to_sec()
+        if time_diff > 0:
+            # 计算位置差
+            position_diff = current_position-previous_position
+            previous_velocity = position_diff/time_diff
+            previous_position = current_position
+            previous_time = current_time
+        return SequnceState.FIRST_VELOCITY
+    elif previous_position is not None and previous_velocity is not None:
+         time_diff = (current_time-previous_time).to_sec()
+         # calc the expected position
+         expected_position = previous_position + previous_velocity*time_diff
+         distance = np.linalg.norm(expected_position-current_position)
+         if distance < threshold:
+            return SequnceState.NORMAL
+         else:
+            return SequnceState.OUTLIER
+
+
+def get_linear_velocity(current_position,current_time:rospy.Time):
+    global previous_position
+    global previous_time
+    if previous_position is not None and previous_time is not None:
         time_diff = (current_time-previous_time).to_sec()
         if time_diff > 0:
             # 计算位置差
@@ -102,19 +132,18 @@ def get_linear_velocity(current_position,current_time:rospy.Time):
             return linear_velocity
     else:
         return np.full((3,),np.nan)
-    
 
         
 
 
 
-def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
+def perception_callback(rgb_msg:Image,depth_msg:Image,odemetry_msg:Odometry):
     global annotated_frame_publisher
     global bridge
     global model
     try:
         # Convert the ROS Image message to a format OpenCV can work with
-        cv_image = bridge.imgmsg_to_cv2(synced_msg.rgb_image, desired_encoding='passthrough')
+        cv_image = bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='passthrough')
         results=track(model,cv_image)
         if len(results) == 1:
             cat2id2_xywhbox = get_target_category_box(results,[0])
@@ -133,15 +162,26 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
             
 
             if x!=-1 and y!=-1:
-                cv_depth = bridge.imgmsg_to_cv2(synced_msg.depth_image,desired_encoding="passthrough")
+                expire_previous_position_velocity(rospy.Time.now())
+                cv_depth = bridge.imgmsg_to_cv2(depth_msg,desired_encoding="passthrough")
                 depth = get_uv_depth(cv_depth,x,y)
                 t = odemetry_msg.pose.pose.position
                 t_array = np.array([t.x,t.y,t.z])
                 o = odemetry_msg.pose.pose.orientation
                 o_array = np.array([o.w,o.x,o.y,o.z])
-                extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
-                world_point_ENU =unproject(x,y,depth,camera_intrinsic_matrix,camera_eular_angle,camera_translation,extrinsic_matrix)
-
+                extrinsic_matrix = construct_inverse_extrinsic_with_quaternion(o_array,t_array)
+                world_point_ENU =unproject(x,y,depth,intrinsic_matrix,extrinsic_matrix)
+                
+                # test if the point is outlier point 
+                state = is_outlier(world_point_ENU,rospy.Time.now(),30)
+                if state == SequnceState.FIRST_POSITION or state == SequnceState.FIRST_VELOCITY:
+                   return
+                elif state == SequnceState.OUTLIER:
+                    world_point_ENU = previous_position
+                    linear_velocity = previous_velocity
+                
+                elif state==SequnceState.NORMAL:
+                    linear_velocity = get_linear_velocity(world_point_ENU,rospy.Time.now())
                 res_point = PointStamped()
                 res_point.header.stamp = odemetry_msg.header.stamp
                 res_point.header.frame_id = odemetry_msg.header.frame_id
@@ -161,19 +201,15 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                 odo_msg.pose.pose.orientation.y = 0.0
                 odo_msg.pose.pose.orientation.z = 0.0
                 odo_msg.pose.pose.orientation.w = 1.0
-                linear_velocity = get_linear_velocity(world_point_ENU,rospy.Time.now())
+                # linear_velocity = get_linear_velocity(world_point_ENU,rospy.Time.now())
                 odo_msg.twist.twist.linear.x = linear_velocity[0]
                 odo_msg.twist.twist.linear.y = linear_velocity[1]
                 odo_msg.twist.twist.linear.z = linear_velocity[2]
 
-                yaw = math.atan2(linear_velocity[1], linear_velocity[0])
-                quat = quaternion_from_euler(0, 0, yaw)
-                odo_msg.pose.pose.orientation.x = quat[0]
-                odo_msg.pose.pose.orientation.y = quat[1]
-                odo_msg.pose.pose.orientation.z = quat[2]
-                odo_msg.pose.pose.orientation.w = quat[3]
-
                 odom_publisher.publish(odo_msg)
+                
+                rospy.loginfo("----------------------------------------------")
+                rospy.loginfo(world_point_ENU)
 
 
                 global target_x,target_y
@@ -183,9 +219,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                
                 global drone_yaw
                 drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
-        rospy.loginfo("-----------------------------------------------------")
-        rospy.loginfo(target_x)
-        rospy.loginfo(target_y)
+
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 
@@ -209,33 +243,29 @@ def sensor_perception():
     client.takeoffAsync().join()
     client.moveToPositionAsync(0, 0, -6, 3).join()
     client.hoverAsync().join()
-    rospy.loginfo("take off succ")
-    rospy.loginfo("take off")
     
-    # # rgb image in camera_1
+    # rgb image in camera_1
     vehicle_name = rospy.get_param("/vehicle_name", "drone_1")
-    # rgb_camera = "camera_1"
-    # camera_type_scene = "Scene"
-    # rgb_topic = f"/airsim_node/{vehicle_name}/{rgb_camera}/{camera_type_scene}"
+    rgb_camera = "camera_1"
+    camera_type_scene = "Scene"
+    rgb_topic = f"/airsim_node/{vehicle_name}/{rgb_camera}/{camera_type_scene}"
 
-    # # depth image in camera_2
-    # depth_camera = "camera_2"
-    # camera_type_depth = "DepthPlanar"
-    # depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
-
-    # camera_topic 
-    camera_topic  = '/airsim/synced_image'
+    # depth image in camera_2
+    depth_camera = "camera_2"
+    camera_type_depth = "DepthPlanar"
+    depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
 
     # drone odemetry
     odom_local_enu = "odom_local_enu"
     odemetry_topic = f"/airsim_node/{vehicle_name}/{odom_local_enu}"
 
-    camera_sub = Subscriber(camera_topic,SyncedImg)
+    rgb_sub = Subscriber(rgb_topic,Image)
+    depth_sub = Subscriber(depth_topic,Image)
     odemetry_sub = Subscriber(odemetry_topic,Odometry)
 
-    # rospy.Timer(rospy.Duration(0.1), pub_cmd)
+    rospy.Timer(rospy.Duration(0.1), pub_cmd)
 
-    ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.01)
+    ats = ApproximateTimeSynchronizer([rgb_sub, depth_sub,odemetry_sub], queue_size=10, slop=0.25)
     ats.registerCallback(perception_callback)
     rospy.spin()
 
