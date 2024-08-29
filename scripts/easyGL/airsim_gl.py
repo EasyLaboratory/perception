@@ -40,6 +40,20 @@ def get_target_category_box(results:List,target_category_list:List[str],box_type
            cat2id2box[category.item()] = { entity.item():bbox.tolist() for entity,bbox in zip(track_id,bbox)}
     return cat2id2box
 
+def get_conf(results:List,target_category_list:List[str]):
+    cat2id2conf = {}
+    for result in results:
+        box:ultralytics.engine.results.Boxes = result.boxes
+        if box.id is None:
+            return {}
+        category = box.cls # 对象类别
+        track_id = box.id # 跟踪 ID
+        conf = box.conf
+        if category in target_category_list:
+            cat2id2conf[category.item()] = {entity.item():bbox.tolist() for entity,bbox in zip(track_id,conf)}
+    return cat2id2conf
+    
+
 
 def get_uv(cat2id2box,category,id)->List[int]:
     if cat2id2box:
@@ -51,7 +65,11 @@ def get_box(cat2id2box,category,id):
         return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1]),int(cat2id2box[category][id][2]),int(cat2id2box[category][id][3])
     return -1,-1,-1,-1
 
-def get_annotated_image(results:List[ultralytics.engine.results.Results],label,x1,y1,x2,y2):
+# def get_conf(cat2id2box,category,id):
+#     if cat2id2box:
+#         return cat2id2box[category][]
+
+def get_annotated_image(results:List[ultralytics.engine.results.Results],label,conf,x1,y1,x2,y2):
     if x1==-1 and x2==-1 and y1==-1 and y2 == -1:
         return []
     annotated_image:List = []
@@ -60,7 +78,8 @@ def get_annotated_image(results:List[ultralytics.engine.results.Results],label,x
         center_point_y = int((y1+y2)/2)
         temp = copy.deepcopy(result.orig_img)
         temp = cv2.rectangle(temp, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        temp = cv2.putText(temp, str(label), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+        temp = cv2.putText(temp, str(label), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+        temp = cv2.putText(temp,str(conf),(x1+40,y1-10),cv2.FONT_HERSHEY_SIMPLEX,0.8, (0, 255, 0), 2)
         temp = cv2.circle(temp, (center_point_x, center_point_y), radius=20, color=(255, 0, 0), thickness=-1)  # 使用蓝色圆点标记
         annotated_image.append(temp)
     return annotated_image

@@ -29,7 +29,7 @@ odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
 point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
 camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
-camera_translation = Translation(x=0.5,y=0,z=0)
+camera_translation = Translation(x=0,y=0,z=0)
 
 
 K=[640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
@@ -55,9 +55,6 @@ def calculate_yaw(drone_pos, target_pos):
     
     dx = target_pos[0] - drone_pos[0]
     dy = target_pos[1] - drone_pos[1]
-
-    dist= math.sqrt(dx**2+ dy**2)
-    rospy.loginfo(f"dist: {dist}")
 
     yaw = math.atan2(dy, dx)
 
@@ -119,10 +116,16 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
         if len(results) == 1:
             cat2id2_xywhbox = get_target_category_box(results,[0])
             x,y,w,h = get_box(cat2id2_xywhbox,0,1)
-            # todo: use new uv to print
+            
+            conf = get_conf(results,[0])
+            if not conf or conf[0.0][1.0] < 0.9:
+                return
+            else:
+                conf_label = conf[0.0][1.0]
+            
             cat2id2_xyxybox = get_target_category_box(results,[0],box_type="xyxy")
             x1,y1,x2,y2 = get_box(cat2id2_xyxybox,0,1)
-            annotated_image=get_annotated_image(results,1,x1,y1,x2,y2)
+            annotated_image=get_annotated_image(results,"car",conf_label,x1,y1,x2,y2)
             if annotated_image:
                 first_image = annotated_image[0]
                 # Convert the processed image (result) back to a ROS Image message
@@ -148,6 +151,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                 res_point.point.x = world_point_ENU[0]
                 res_point.point.y = world_point_ENU[1]
                 res_point.point.z = world_point_ENU[2]
+                point_publisher.publish(res_point)
 
                 # point_publisher.publish(res_point)
                 odo_msg = Odometry()
@@ -166,15 +170,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                 odo_msg.twist.twist.linear.y = linear_velocity[1]
                 odo_msg.twist.twist.linear.z = linear_velocity[2]
 
-                yaw = math.atan2(linear_velocity[1], linear_velocity[0])
-                quat = quaternion_from_euler(0, 0, yaw)
-                odo_msg.pose.pose.orientation.x = quat[0]
-                odo_msg.pose.pose.orientation.y = quat[1]
-                odo_msg.pose.pose.orientation.z = quat[2]
-                odo_msg.pose.pose.orientation.w = quat[3]
-
                 odom_publisher.publish(odo_msg)
-
 
                 global target_x,target_y
                 target_x=world_point_ENU[0]
@@ -183,9 +179,6 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                
                 global drone_yaw
                 drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
-        rospy.loginfo("-----------------------------------------------------")
-        rospy.loginfo(target_x)
-        rospy.loginfo(target_y)
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 
