@@ -118,7 +118,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
             x,y,w,h = get_box(cat2id2_xywhbox,0,1)
             
             conf = get_conf(results,[0])
-            if not conf or conf[0.0][1.0] < 0.9:
+            if not conf or conf[0.0][1.0] < 0.8:
                 return
             else:
                 conf_label = conf[0.0][1.0]
@@ -226,7 +226,7 @@ def sensor_perception():
     camera_sub = Subscriber(camera_topic,SyncedImg)
     odemetry_sub = Subscriber(odemetry_topic,Odometry)
 
-    # rospy.Timer(rospy.Duration(0.1), pub_cmd)
+    rospy.Timer(rospy.Duration(0.1), pub_cmd)
 
     ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.01)
     ats.registerCallback(perception_callback)

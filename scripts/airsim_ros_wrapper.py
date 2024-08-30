@@ -4,7 +4,14 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import numpy as np
 from perception_msgs.msg import SyncedImg
+from pathlib import Path
+import cv2
 
+current_dir = Path(__file__).parent.parent.resolve()
+dataset_path = current_dir/"dataset"
+image_id = 0
+
+is_record = True
 
 def process_rgb_msg2numpyarray(rgb_response):
     # Check if the RGB response is valid
@@ -70,6 +77,15 @@ class AirSimImagePublisher:
         rgb_img = process_rgb_msg2numpyarray(rgb_response)
         depth_img = process_depth_msg2numpyarray(depth_response)
         
+        
+        if is_record:
+            global image_id
+            rospy.loginfo(dataset_path)
+            if not dataset_path.exists():
+                dataset_path.mkdir()
+            rgb_name = dataset_path/f"rgb_image_{image_id}.png"
+            cv2.imwrite(rgb_name,rgb_img)
+            image_id += 1
 
         # 将OpenCV图像转换为ROS图像
         ros_rgb_image = self.bridge.cv2_to_imgmsg(rgb_img, encoding="bgr8")
