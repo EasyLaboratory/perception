@@ -11,7 +11,7 @@
     ```
 2. Set up the virtual environment
     ```bash
-    pip -m venv yolo_venv
+    python -m venv yolo_venv
     source yolo_venv/bin/activate
     pip install -r requirements.txt
     ```

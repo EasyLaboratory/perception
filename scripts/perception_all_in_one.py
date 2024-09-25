@@ -19,7 +19,7 @@ client = None
 current_dir = Path(__file__).resolve()
 project_root = current_dir.parent.parent
 model_base_path = project_root/"models"
-model_path = model_base_path/"yolov10s_v1.pt"
+model_path = model_base_path/"yolov10s_v2.pt"
 
 model:ultralytics.YOLO = YOLO(model_path)
 
@@ -68,9 +68,6 @@ def pub_cmd(event):
 def get_uv_depth(cv_depth:np.ndarray,u,v):
     return cv_depth[v][u]
 
-def construct_point_msg_array(point):
-    point_msg = PointStamped(point[0],point[1],point[2])
-    return point_msg
 
 
 def connect2client(ip):
@@ -106,6 +103,7 @@ def get_linear_velocity(current_position,current_time:rospy.Time):
 
 
 def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
+    print("进入了callback 函数")
     global annotated_frame_publisher
     global bridge
     global model
@@ -113,6 +111,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
         # Convert the ROS Image message to a format OpenCV can work with
         cv_image = bridge.imgmsg_to_cv2(synced_msg.rgb_image, desired_encoding='passthrough')
         results=track(model,cv_image)
+        print("预测完成")
         if len(results) == 1:
             cat2id2_xywhbox = get_target_category_box(results,[0])
             x,y,w,h = get_box(cat2id2_xywhbox,0,1)
@@ -184,11 +183,6 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
 
 
 
-def signal_handler(sig, frame):
-    print('Shutting down gracefully')
-    rospy.signal_shutdown('Signal received')
-
-signal.signal(signal.SIGINT, signal_handler)
  
 
 
@@ -197,24 +191,10 @@ def sensor_perception():
     rospy.init_node('perception_node', anonymous=True)
 
     remote_ip = rospy.get_param("~remote_ip","127.0.0.1")
-    connect2client(remote_ip)
-    client.armDisarm(True)
-    client.takeoffAsync().join()
-    client.moveToPositionAsync(0, 0, -6, 3).join()
-    client.hoverAsync().join()
-    rospy.loginfo("take off succ")
-    rospy.loginfo("take off")
+    connect2client(remote_ip)# def signal_handler(sig, frame):
     
-    # # rgb image in camera_1
+    # rgb image in camera_1
     vehicle_name = rospy.get_param("/vehicle_name", "drone_1")
-    # rgb_camera = "camera_1"
-    # camera_type_scene = "Scene"
-    # rgb_topic = f"/airsim_node/{vehicle_name}/{rgb_camera}/{camera_type_scene}"
-
-    # # depth image in camera_2
-    # depth_camera = "camera_2"
-    # camera_type_depth = "DepthPlanar"
-    # depth_topic = f"/airsim_node/{vehicle_name}/{depth_camera}/{camera_type_depth}"
 
     # camera_topic 
     camera_topic  = '/airsim/synced_image'
@@ -225,10 +205,9 @@ def sensor_perception():
 
     camera_sub = Subscriber(camera_topic,SyncedImg)
     odemetry_sub = Subscriber(odemetry_topic,Odometry)
-
     rospy.Timer(rospy.Duration(0.1), pub_cmd)
-
-    ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.01)
+    print("到这了")
+    ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.5)
     ats.registerCallback(perception_callback)
     rospy.spin()
 

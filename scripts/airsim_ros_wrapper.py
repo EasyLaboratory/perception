@@ -11,7 +11,8 @@ current_dir = Path(__file__).parent.parent.resolve()
 dataset_path = current_dir/"dataset"
 image_id = 0
 
-is_record = True
+# if the is_record flag is true, the camera will capture the scene automatically
+is_record = False
 
 def process_rgb_msg2numpyarray(rgb_response):
     # Check if the RGB response is valid
