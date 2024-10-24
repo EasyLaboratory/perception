@@ -80,7 +80,7 @@ def get_annotated_image(results:List[ultralytics.engine.results.Results],label,c
         temp = cv2.rectangle(temp, (x1, y1), (x2, y2), (0, 255, 0), 2)
         temp = cv2.putText(temp, str(label), (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
         temp = cv2.putText(temp,str(conf),(x1+40,y1-10),cv2.FONT_HERSHEY_SIMPLEX,0.8, (0, 255, 0), 2)
-        temp = cv2.circle(temp, (center_point_x, center_point_y), radius=20, color=(255, 0, 0), thickness=-1)  # 使用蓝色圆点标记
+        temp = cv2.circle(temp, (center_point_x, center_point_y), radius=8, color=(255, 0, 0), thickness=-1)  # 使用蓝色圆点标记
         annotated_image.append(temp)
     return annotated_image
 

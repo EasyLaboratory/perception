@@ -19,7 +19,7 @@ client = None
 current_dir = Path(__file__).resolve()
 project_root = current_dir.parent.parent
 model_base_path = project_root/"models"
-model_path = model_base_path/"yolov10s_v2.pt"
+model_path = model_base_path/"yolov10n_v2.pt"
 
 model:ultralytics.YOLO = YOLO(model_path)
 
@@ -103,7 +103,6 @@ def get_linear_velocity(current_position,current_time:rospy.Time):
 
 
 def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
-    print("进入了callback 函数")
     global annotated_frame_publisher
     global bridge
     global model
@@ -111,7 +110,6 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
         # Convert the ROS Image message to a format OpenCV can work with
         cv_image = bridge.imgmsg_to_cv2(synced_msg.rgb_image, desired_encoding='passthrough')
         results=track(model,cv_image)
-        print("预测完成")
         if len(results) == 1:
             cat2id2_xywhbox = get_target_category_box(results,[0])
             x,y,w,h = get_box(cat2id2_xywhbox,0,1)
@@ -124,7 +122,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
             
             cat2id2_xyxybox = get_target_category_box(results,[0],box_type="xyxy")
             x1,y1,x2,y2 = get_box(cat2id2_xyxybox,0,1)
-            annotated_image=get_annotated_image(results,"car",conf_label,x1,y1,x2,y2)
+            annotated_image=get_annotated_image(results,"ship",conf_label,x1,y1,x2,y2)
             if annotated_image:
                 first_image = annotated_image[0]
                 # Convert the processed image (result) back to a ROS Image message
@@ -174,6 +172,9 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                 global target_x,target_y
                 target_x=world_point_ENU[0]
                 target_y=world_point_ENU[1]
+                rospy.loginfo("---------------------------------")
+                rospy.loginfo(x)
+                rospy.loginfo(y)
                 drone_pos = np.array([odemetry_msg.pose.pose.position.x,odemetry_msg.pose.pose.position.y])
                
                 global drone_yaw
@@ -205,8 +206,10 @@ def sensor_perception():
 
     camera_sub = Subscriber(camera_topic,SyncedImg)
     odemetry_sub = Subscriber(odemetry_topic,Odometry)
+    
+    client.takeoffAsync().join()
+    rospy.loginfo("drone takes off")
     rospy.Timer(rospy.Duration(0.1), pub_cmd)
-    print("到这了")
     ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.5)
     ats.registerCallback(perception_callback)
     rospy.spin()

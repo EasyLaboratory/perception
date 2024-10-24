@@ -39,18 +39,21 @@ def process_depth_msg2numpyarray(depth_response):
         if img_depth1d.size == depth_response.width * depth_response.height:
             img_depth = img_depth1d.reshape(depth_response.height, depth_response.width)
             depth_image = img_depth
+            return depth_image
             # 将深度图像转换为 8 位单通道图像以便显示
             # depth_image = cv2.normalize(img_depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
         else:
             rospy.logerr("dimension mismatch")
     else:
         rospy.loginfo("Invalid Depth response received.")
-    return depth_image
+    rospy.loginfo("什么都没做")
+    
 
 class AirSimImagePublisher:
     def __init__(self):
         # 初始化ROS节点
         rospy.init_node('airsim_image_publisher', anonymous=True)
+        self.remote_ip = rospy.get_param("~remote_ip","127.0.0.1")
 
         self.synced_image_pub = rospy.Publisher('/airsim/synced_image',SyncedImg,queue_size=100)
 
@@ -58,9 +61,10 @@ class AirSimImagePublisher:
         self.bridge = CvBridge()
 
         # 连接到AirSim
-        self.client = airsim.MultirotorClient()
+        self.client = airsim.MultirotorClient(ip="192.168.1.5")
         self.client.confirmConnection()
         self.client.enableApiControl(True)
+        
 
         # 设置Timer，周期性地调用回调函数
         self.timer = rospy.Timer(rospy.Duration(0.05), self.timer_callback)  # 20HZ
@@ -74,6 +78,7 @@ class AirSimImagePublisher:
 
         rgb_response = responses[0]
         depth_response = responses[1]
+        
         
         rgb_img = process_rgb_msg2numpyarray(rgb_response)
         depth_img = process_depth_msg2numpyarray(depth_response)
