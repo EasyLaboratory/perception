@@ -46,7 +46,6 @@ def process_depth_msg2numpyarray(depth_response):
             rospy.logerr("dimension mismatch")
     else:
         rospy.loginfo("Invalid Depth response received.")
-    rospy.loginfo("什么都没做")
     
 
 class AirSimImagePublisher:
@@ -61,7 +60,7 @@ class AirSimImagePublisher:
         self.bridge = CvBridge()
 
         # 连接到AirSim
-        self.client = airsim.MultirotorClient(ip="192.168.1.5")
+        self.client = airsim.MultirotorClient(ip=self.remote_ip)
         self.client.confirmConnection()
         self.client.enableApiControl(True)
         

@@ -62,10 +62,13 @@ def calculate_yaw(drone_pos, target_pos):
 
 
 def pub_cmd(event):
-    client.moveToPositionAsync(target_y,target_x, -6, 10, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
+    client.moveToPositionAsync(target_y,target_x, -6, 15, 5,yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=drone_yaw))
 
 
 def get_uv_depth(cv_depth:np.ndarray,u,v):
+    # 深度相机的分辨率是彩色相机的一半
+    u = int(u/2)
+    v = int(v/2)
     return cv_depth[v][u]
 
 
@@ -115,7 +118,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
             x,y,w,h = get_box(cat2id2_xywhbox,0,1)
             
             conf = get_conf(results,[0])
-            if not conf or conf[0.0][1.0] < 0.8:
+            if not conf or conf[0.0][1.0] < 0.4:
                 return
             else:
                 conf_label = conf[0.0][1.0]
@@ -172,9 +175,6 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                 global target_x,target_y
                 target_x=world_point_ENU[0]
                 target_y=world_point_ENU[1]
-                rospy.loginfo("---------------------------------")
-                rospy.loginfo(x)
-                rospy.loginfo(y)
                 drone_pos = np.array([odemetry_msg.pose.pose.position.x,odemetry_msg.pose.pose.position.y])
                
                 global drone_yaw

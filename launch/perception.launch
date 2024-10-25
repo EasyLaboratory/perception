@@ -21,10 +21,13 @@
 
 <launch>
     <arg name="venv" value="$(find perception)/yolo_venv/bin/python3"/>
+    <!-- set the ip of your airsim host,example:"192.168.1.5" -->
     <arg name="remote_ip" default="127.0.0.1"/>
     <node name="airsim_wrapper_node" pkg="perception" type="airsim_ros_wrapper.py" output="screen" launch-prefix = "$(arg venv)" >
     </node>
     <node name="perception_node" pkg="perception" type="perception_all_in_one.py" output="screen" launch-prefix = "$(arg venv)" >
         <param name="remote_ip" value="$(arg remote_ip)"/>
     </node>
+    <!-- 启动 rosbag 来录制特定话题 -->
+    <node name="record_annotated_image" pkg="rosbag" type="record" output="screen" args="-O /home/paw/test.bag /annotated_image" />
 </launch>
