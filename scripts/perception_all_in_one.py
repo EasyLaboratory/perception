@@ -19,7 +19,7 @@ client = None
 current_dir = Path(__file__).resolve()
 project_root = current_dir.parent.parent
 model_base_path = project_root/"models"
-model_path = model_base_path/"yolov10n_v2.pt"
+model_path = model_base_path/"yolov10n_v3.pt"
 
 model:ultralytics.YOLO = YOLO(model_path)
 
@@ -209,7 +209,7 @@ def sensor_perception():
     
     client.takeoffAsync().join()
     rospy.loginfo("drone takes off")
-    rospy.Timer(rospy.Duration(0.1), pub_cmd)
+    # rospy.Timer(rospy.Duration(0.1), pub_cmd)
     ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.5)
     ats.registerCallback(perception_callback)
     rospy.spin()

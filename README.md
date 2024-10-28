@@ -35,6 +35,10 @@
     rostopic list
     rostopic echo /some/camera/info
     ```
+## Dependency
+1. airsim simulator
+2. Intel RealsenseD457
+
 ## Road Map
 1. Improve the model accuracy to adapt the changing road conditions.
 2. Process the noise of the deep camera.
