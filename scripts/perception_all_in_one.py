@@ -47,6 +47,34 @@ target_y=0
 drone_yaw = 0
 current_yaw = 0
 
+previous_frame = None
+lost_frame = 0
+previous_odom = None
+processed_frame_publisher = rospy.Publisher("/processed_image",Image,queue_size=9)
+
+
+
+def lost_target():
+    """
+    处理目标丢失的情况
+    """
+    global lost_frame
+    global previous_odom
+    global previous_frame
+    if previous_odom is None or previous_frame is None:
+        return
+    if lost_frame >12:
+        if drone_yaw > 0:
+            yaw_rate =drone_yaw + 15
+        else:
+            yaw_rate = drone_yaw- 15
+        yaw_mode = airsim.YawMode(is_rate=False, yaw_or_rate=yaw_rate)
+        client.moveByVelocityZAsync(0, 0, -10, 5, yaw_mode=yaw_mode).join()
+        rospy.loginfo("**************************************")
+        rospy.loginfo("长时间无目标")
+    else:
+        odom_publisher.publish(previous_odom)
+        # annotated_frame_publisher.publish(previous_frame)
 
 
 def calculate_yaw(drone_pos, target_pos):
@@ -109,6 +137,7 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
     global annotated_frame_publisher
     global bridge
     global model
+    global lost_frame
     try:
         # Convert the ROS Image message to a format OpenCV can work with
         cv_image = bridge.imgmsg_to_cv2(synced_msg.rgb_image, desired_encoding='passthrough')
@@ -136,6 +165,8 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
             
 
             if x!=-1 and y!=-1:
+                lost_frame = 0
+
                 cv_depth = bridge.imgmsg_to_cv2(synced_msg.depth_image,desired_encoding="passthrough")
                 depth = get_uv_depth(cv_depth,x,y)
                 t = odemetry_msg.pose.pose.position
@@ -179,9 +210,20 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                
                 global drone_yaw
                 drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
+                rospy.loginfo("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+                rospy.loginfo(drone_yaw)
+                
+                global previous_frame
+                previous_frame = annotated_image[0]
+                global previous_odom
+                previous_odom = odemetry_msg
+
         else:
             rospy.loginfo("---------------------------------------------------------")
-            rospy.loginfo("视野内没有目标")
+            rospy.loginfo("存在丢失帧")
+            lost_frame += 1
+            lost_target()
+
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 
@@ -212,7 +254,7 @@ def sensor_perception():
     
     client.takeoffAsync().join()
     rospy.loginfo("drone takes off")
-    # rospy.Timer(rospy.Duration(0.1), pub_cmd)
+    rospy.Timer(rospy.Duration(0.1), pub_cmd)
     ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.5)
     ats.registerCallback(perception_callback)
     rospy.spin()
