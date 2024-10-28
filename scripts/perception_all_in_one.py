@@ -179,6 +179,9 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
                
                 global drone_yaw
                 drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
+        else:
+            rospy.loginfo("---------------------------------------------------------")
+            rospy.loginfo("视野内没有目标")
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
 

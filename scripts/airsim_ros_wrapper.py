@@ -52,7 +52,7 @@ class AirSimImagePublisher:
     def __init__(self):
         # 初始化ROS节点
         rospy.init_node('airsim_image_publisher', anonymous=True)
-        rospy.loginfo(self.remote_ip)
+        self.remote_ip = rospy.get_param("~remote_ip","127.0.0.1")
 
         self.synced_image_pub = rospy.Publisher('/airsim/synced_image',SyncedImg,queue_size=100)
 
