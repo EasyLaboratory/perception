@@ -52,29 +52,51 @@ lost_frame = 0
 previous_odom = None
 processed_frame_publisher = rospy.Publisher("/processed_image",Image,queue_size=9)
 
-
-
-def lost_target():
+def lost_target(odom_msg_header_stamp,odom_msg_header_frame_id):
     """
     处理目标丢失的情况
     """
     global lost_frame
     global previous_odom
     global previous_frame
-    if previous_odom is None or previous_frame is None:
-        return
     if lost_frame >12:
-        if drone_yaw > 0:
-            yaw_rate =drone_yaw + 15
-        else:
-            yaw_rate = drone_yaw- 15
-        yaw_mode = airsim.YawMode(is_rate=False, yaw_or_rate=yaw_rate)
-        client.moveByVelocityZAsync(0, 0, -10, 5, yaw_mode=yaw_mode).join()
-        rospy.loginfo("**************************************")
-        rospy.loginfo("长时间无目标")
-    else:
-        odom_publisher.publish(previous_odom)
-        # annotated_frame_publisher.publish(previous_frame)
+        odo_msg = Odometry()
+        odo_msg.header.stamp = odom_msg_header_stamp
+        odo_msg.header.frame_id = odom_msg_header_frame_id
+        odo_msg.pose.pose.position.x = -1
+        odo_msg.pose.pose.position.y = -1
+        odo_msg.pose.pose.position.z = -1
+        # 设置方向为默认值，因为没有方向信息
+        odo_msg.pose.pose.orientation.x = -1
+        odo_msg.pose.pose.orientation.y = -1
+        odo_msg.pose.pose.orientation.z = -1
+        odo_msg.pose.pose.orientation.w = -1
+        odo_msg.twist.twist.linear.x = -1
+        odo_msg.twist.twist.linear.y = -1
+        odo_msg.twist.twist.linear.z = -1
+        odom_publisher.publish(odo_msg)
+
+# def lost_target():
+#     """
+#     处理目标丢失的情况
+#     """
+#     global lost_frame
+#     global previous_odom
+#     global previous_frame
+#     if previous_odom is None or previous_frame is None:
+#         return
+#     if lost_frame >12:
+#         if drone_yaw > 0:
+#             yaw_rate =drone_yaw + 15
+#         else:
+#             yaw_rate = drone_yaw- 15
+#         yaw_mode = airsim.YawMode(is_rate=False, yaw_or_rate=yaw_rate)
+#         client.moveByVelocityZAsync(0, 0, -10, 5, yaw_mode=yaw_mode).join()
+#         rospy.loginfo("**************************************")
+#         rospy.loginfo("长时间无目标")
+#     else:
+#         odom_publisher.publish(previous_odom)
+#         # annotated_frame_publisher.publish(previous_frame)
 
 
 def calculate_yaw(drone_pos, target_pos):
@@ -222,7 +244,8 @@ def perception_callback(synced_msg:SyncedImg,odemetry_msg:Odometry):
             rospy.loginfo("---------------------------------------------------------")
             rospy.loginfo("存在丢失帧")
             lost_frame += 1
-            lost_target()
+            # lost_target()
+            lost_target(odemetry_msg.header.stamp,"no")
 
     except CvBridgeError as e:
         rospy.logerr("CvBridge Error: {0}".format(e))
@@ -237,7 +260,7 @@ def sensor_perception():
     rospy.init_node('perception_node', anonymous=True)
 
     remote_ip = rospy.get_param("~remote_ip","127.0.0.1")
-    connect2client(remote_ip)# def signal_handler(sig, frame):
+    # connect2client(remote_ip)# def signal_handler(sig, frame):
     
     # rgb image in camera_1
     vehicle_name = rospy.get_param("/vehicle_name", "drone_1")
@@ -252,9 +275,9 @@ def sensor_perception():
     camera_sub = Subscriber(camera_topic,SyncedImg)
     odemetry_sub = Subscriber(odemetry_topic,Odometry)
     
-    client.takeoffAsync().join()
-    rospy.loginfo("drone takes off")
-    rospy.Timer(rospy.Duration(0.1), pub_cmd)
+    # client.takeoffAsync().join()
+    # rospy.loginfo("drone takes off")
+    # rospy.Timer(rospy.Duration(0.1), pub_cmd)
     ats = ApproximateTimeSynchronizer([camera_sub,odemetry_sub], queue_size=20, slop=0.5)
     ats.registerCallback(perception_callback)
     rospy.spin()
