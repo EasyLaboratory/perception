@@ -37,11 +37,11 @@ class UDP2ROS:
                 # 将 JSON 数据转换为 Float32MultiArray 类型
                 control_data = Float32MultiArray()
                 control_data.data = [
-                    json_data["speed"],
+                    json_data["control_speed"],
                     json_data["pitch"],
                     json_data["roll"],
                     json_data["yaw"],
-                    json_data["command"]
+                    json_data["control_command"]
                 ]
 
                 # 发布云台控制数据到 ROS 话题

@@ -40,6 +40,7 @@ catkin_install_python(PROGRAMS
    scripts/perception_all_in_one.py
    scripts/airsim_ros_wrapper.py
    scripts/gimbal_ros_wrapper.py
+   scripts/gimbal_controller.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

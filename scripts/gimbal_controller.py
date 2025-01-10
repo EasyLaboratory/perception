@@ -3,6 +3,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 from message_filters import Subscriber, ApproximateTimeSynchronizer
+from std_msgs.msg import Float32MultiArray
 
 class Gimbal:
     def __init__(self):
@@ -15,9 +16,10 @@ class Gimbal:
         # 创建两个话题的订阅者
         self.rgb_subscriber = Subscriber("camera/rgb/image", Image)
         self.depth_subscriber = Subscriber("camera/depth/image", Image)
+        self.gimbal_subsciber = Subscriber("/gimbal_control",Float32MultiArray)
         
         # 创建同步器，使用 ApproximateTimeSynchronizer 允许近似时间同步
-        self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber, self.depth_subscriber], queue_size=10, slop=0.1)
+        self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber, self.depth_subscriber,self.gimbal_subsciber], queue_size=10, slop=0.1)
         self.sync.registerCallback(self.synced_callback)
 
     def synced_callback(self, rgb_msg, depth_msg):
@@ -26,9 +28,9 @@ class Gimbal:
             rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
             # 转换 Depth 图像
             depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='32FC1')
-            
+            rospy.loginfo("成功转换")
             # 同时处理 RGB 和 Depth 图像
-            self.process_images(rgb_image, depth_image)
+            # self.process_images(rgb_image, depth_image)
         except Exception as e:
             rospy.logerr("Error processing synchronized images: %s", str(e))
     
