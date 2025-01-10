@@ -1,0 +1,10 @@
+<launch>
+    <!-- <arg name="venv" value="$(find perception)/yolo_venv/bin/python3"/> -->
+    <!-- set the ip of your airsim host,example:"192.168.1.5" -->
+    <arg name="listen_ip" default="0.0.0.0"/>
+    <arg name="listen_port" default="9000"/>
+    <node name="udp2ros_node" pkg="perception" type="gimbal_ros_wrapper.py" output="screen">
+        <param name="~listen_ip" value="$(arg listen_ip)" />
+        <param name="~listen_port" value="$(arg listen_ip)" />
+    </node>
+</launch>
