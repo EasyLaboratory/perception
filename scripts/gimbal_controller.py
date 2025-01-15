@@ -3,7 +3,8 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 from message_filters import Subscriber, ApproximateTimeSynchronizer
-from std_msgs.msg import Float32MultiArray
+from perception.msg import GimbalControl
+
 
 class Gimbal:
     def __init__(self):
@@ -16,10 +17,10 @@ class Gimbal:
         # 创建两个话题的订阅者
         self.rgb_subscriber = Subscriber("camera/rgb/image", Image)
         self.depth_subscriber = Subscriber("camera/depth/image", Image)
-        self.gimbal_subsciber = Subscriber("/gimbal_control",Float32MultiArray)
+        self.gimbal_subsciber = Subscriber("/gimbal_control",GimbalControl)
         
         # 创建同步器，使用 ApproximateTimeSynchronizer 允许近似时间同步
-        self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber, self.depth_subscriber,self.gimbal_subsciber], queue_size=10, slop=0.1)
+        self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber, self.depth_subscriber], queue_size=10, slop=0.1)
         self.sync.registerCallback(self.synced_callback)
 
     def synced_callback(self, rgb_msg, depth_msg):

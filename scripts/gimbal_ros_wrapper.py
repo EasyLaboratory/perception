@@ -2,6 +2,7 @@ import rospy
 import json
 import socket
 from std_msgs.msg import Float32MultiArray
+from perception.msg import GimbalControl
 
 class UDP2ROS:
     def __init__(self):
@@ -17,7 +18,7 @@ class UDP2ROS:
         rospy.init_node('udp2ros_node')
 
         # 创建发布器，发布云台控制数据
-        self.pub = rospy.Publisher('gimbal_control', Float32MultiArray, queue_size=10)
+        self.pub = rospy.Publisher('gimbal_control', GimbalControl, queue_size=10)
 
         rospy.loginfo(f"Listening for status messages on {self.listen_ip}:{self.listen_port}...")
 
@@ -30,23 +31,23 @@ class UDP2ROS:
             try:
                 # 解析 JSON 数据
                 json_data = json.loads(message)
-
-                # 打印收到的数据
-                rospy.loginfo(f"Received message: {json_data}")
+                
+                control_data = GimbalControl()
 
                 # 将 JSON 数据转换为 Float32MultiArray 类型
-                control_data = Float32MultiArray()
-                control_data.data = [
+                control_data_array = Float32MultiArray()
+                control_data_array.data = [
                     json_data["control_speed"],
                     json_data["pitch"],
                     json_data["roll"],
                     json_data["yaw"],
                     json_data["control_command"]
                 ]
-
+                control_data.header.stamp = rospy.Time.now()
+                control_data.data = control_data_array
                 # 发布云台控制数据到 ROS 话题
                 self.pub.publish(control_data)
-                rospy.loginfo(f"Published control data: {control_data.data}")
+                rospy.loginfo(f"Published control data: {control_data.data}  {control_data.header.stamp}")
 
             except json.JSONDecodeError:
                 rospy.logerr("Received data is not valid JSON.")

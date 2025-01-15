@@ -8,11 +8,24 @@ project(perception)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  message_generation
   roscpp
   rospy
   std_msgs
   cv_bridge
   perception_msgs
+)
+catkin_python_setup()
+
+add_message_files(
+  DIRECTORY msg
+  FILES
+  GimbalControl.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
 )
 
 
@@ -35,15 +48,5 @@ include_directories(
 )
 
 
-
-catkin_install_python(PROGRAMS
-   scripts/perception_all_in_one.py
-   scripts/airsim_ros_wrapper.py
-   scripts/gimbal_ros_wrapper.py
-   scripts/gimbal_controller.py
-   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-catkin_python_setup()
 
 
