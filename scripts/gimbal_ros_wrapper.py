@@ -1,8 +1,13 @@
 import rospy
-import json
 import socket
+import struct
 from std_msgs.msg import Float32MultiArray
 from perception.msg import GimbalControl
+from easyGL.gimbalMessage import GimbalControlCode
+
+
+
+
 
 class UDP2ROS:
     def __init__(self):
@@ -26,33 +31,31 @@ class UDP2ROS:
         while not rospy.is_shutdown():
             # 接收 UDP 消息
             data, addr = self.sock.recvfrom(1024)  # 接收最多 1024 字节的数据
-            message = data.decode("utf-8")
+          
+            if len(data) % 4 == 0:
+                # 每 4 字节解码为一个浮点数
+                num_floats = len(data) // 4
+                gimbal_control_array = struct.unpack(f'!{num_floats}f', data)
+                rospy.loginfo(f"Received Floats: {gimbal_control_array}")
+            else:
+                rospy.loginfo(f"Invalid Data Length {len(data)}: {data}")
+            # 将 JSON 数据转换为 Float32MultiArray 
+            control_data = GimbalControl()
+            control_data_array = Float32MultiArray()
+            control_data_array.data = [
+                gimbal_control_array[GimbalControlCode.pitch.value],
+                gimbal_control_array[GimbalControlCode.roll.value],
+                gimbal_control_array[GimbalControlCode.yaw.value],
+                gimbal_control_array[GimbalControlCode.speed.value],
+                gimbal_control_array[GimbalControlCode.command.value]
+            ]
+            
+            control_data.header.stamp = rospy.Time.now()
+            control_data.data = control_data_array
+            # 发布云台控制数据到 ROS 话题
+            self.pub.publish(control_data)
+            rospy.loginfo(f"Published control data: {control_data.data}  {control_data.header.stamp}")
 
-            try:
-                # 解析 JSON 数据
-                json_data = json.loads(message)
-                
-                control_data = GimbalControl()
-
-                # 将 JSON 数据转换为 Float32MultiArray 类型
-                control_data_array = Float32MultiArray()
-                control_data_array.data = [
-                    json_data["control_speed"],
-                    json_data["pitch"],
-                    json_data["roll"],
-                    json_data["yaw"],
-                    json_data["control_command"]
-                ]
-                control_data.header.stamp = rospy.Time.now()
-                control_data.data = control_data_array
-                # 发布云台控制数据到 ROS 话题
-                self.pub.publish(control_data)
-                rospy.loginfo(f"Published control data: {control_data.data}  {control_data.header.stamp}")
-
-            except json.JSONDecodeError:
-                rospy.logerr("Received data is not valid JSON.")
-            except KeyError as e:
-                rospy.logerr(f"Missing key in received message: {e}")
 
     def start(self):
         # 开始监听并发布

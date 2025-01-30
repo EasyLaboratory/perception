@@ -3,25 +3,19 @@
 import rospy
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge,CvBridgeError
-from easyGL.airsim_gl import *
-from pathlib import Path
-from ultralytics import YOLO
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from nav_msgs.msg import Odometry
-from easyGL.transform import quaternion_from_euler,Eular_angle
+from easyGL.transform import quaternion_from_euler,Eular_angle,Translation,construct_inverse_intrinsic_with_k
 from geometry_msgs.msg import PointStamped
 import signal
 import airsim
 from perception_msgs.msg import SyncedImg
+from model_loader import model
+from easyGL.airsim_gl import *
 
 
 client = None
-current_dir = Path(__file__).resolve()
-project_root = current_dir.parent.parent
-model_base_path = project_root/"models"
-model_path = model_base_path/"yolov10n_v3.pt"
 
-model:ultralytics.YOLO = YOLO(model_path)
 
 bridge = CvBridge()
 annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=9)
@@ -120,6 +114,8 @@ def get_uv_depth(cv_depth:np.ndarray,u,v):
     u = int(u/2)
     v = int(v/2)
     return cv_depth[v][u]
+
+
 
 
 

@@ -53,7 +53,8 @@ def get_conf(results:List,target_category_list:List[str]):
             cat2id2conf[category.item()] = {entity.item():bbox.tolist() for entity,bbox in zip(track_id,conf)}
     return cat2id2conf
     
-
+def get_center(x,y,w,h):
+    return (x+w)/2,(y+h)/2
 
 def get_uv(cat2id2box,category,id)->List[int]:
     if cat2id2box:
