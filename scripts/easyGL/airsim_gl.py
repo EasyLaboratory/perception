@@ -7,6 +7,7 @@ import numpy as np
 import cv2
 from typing import List,Dict
 import copy
+import rospy
 
 logger = get_logger(__name__)
 
@@ -123,3 +124,26 @@ def add_noise(depth_map, theta_y):
 
 
     
+
+def get_uv_depth(cv_depth:np.ndarray,u,v,scale=1,max_distance=100):
+    # 深度相机的分辨率是彩色相机的一半
+    u = int(u/scale)
+    v = int(v/scale)
+    return cv_depth[v][u]/255*max_distance
+
+def get_linear_velocity(current_position,current_time:rospy.Time):
+    global previous_position
+    global previous_time
+    if previous_position is None and current_position is not None:
+        previous_position = current_position
+        previous_time = rospy.Time.now()
+        return np.full((3,),np.nan)
+    elif previous_position is not None and previous_time is not None:
+        time_diff = (current_time-previous_time).to_sec()
+        if time_diff > 0:
+            # 计算位置差
+            position_diff = current_position-previous_position
+            linear_velocity = position_diff/time_diff
+            return linear_velocity
+    else:
+        return np.full((3,),np.nan)

@@ -70,27 +70,6 @@ def lost_target(odom_msg_header_stamp,odom_msg_header_frame_id):
         odo_msg.twist.twist.linear.z = -1
         odom_publisher.publish(odo_msg)
 
-# def lost_target():
-#     """
-#     处理目标丢失的情况
-#     """
-#     global lost_frame
-#     global previous_odom
-#     global previous_frame
-#     if previous_odom is None or previous_frame is None:
-#         return
-#     if lost_frame >12:
-#         if drone_yaw > 0:
-#             yaw_rate =drone_yaw + 15
-#         else:
-#             yaw_rate = drone_yaw- 15
-#         yaw_mode = airsim.YawMode(is_rate=False, yaw_or_rate=yaw_rate)
-#         client.moveByVelocityZAsync(0, 0, -10, 5, yaw_mode=yaw_mode).join()
-#         rospy.loginfo("**************************************")
-#         rospy.loginfo("长时间无目标")
-#     else:
-#         odom_publisher.publish(previous_odom)
-#         # annotated_frame_publisher.publish(previous_frame)
 
 
 def calculate_yaw(drone_pos, target_pos):

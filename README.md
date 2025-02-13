@@ -1,5 +1,6 @@
 # Pure Vision Is All You Need
-## usage
+![gimbal](./etc/gimbal.gif)
+## Usage
 1. Create the workspace and clone the perception package
     ``` bash
     mkdir easy_ws
@@ -23,6 +24,31 @@
     ```bash
     roslaunch perception perception.launch remote_ip:=192.168.1.12
     ``` 
+## Fly With Gimbal
+1. Set the UDP buffer. 
+```bash
+sudo sysctl -w net.core.rmem_max=8388608
+sudo sysctl -w net.core.rmem_default=8388608
+```
+2. Start the simulator.
+```bash
+cd LinuxNoEditor
+bash Blocks.sh
+```
+3. Turn on the sensor.
+```bash
+cd easyTrack
+catkin_make
+source ./devel/setup.bash
+roslaunch perception sensor.launch
+```
+4. Take off the drone in another terminal.
+```bash
+cd easyTrack
+source ./devel/setup.bash
+roslaunch se3controller flying_example.launch 
+```
+
 ## Tips
 1. Use the settings in etc directory.
 2. **Set the intrinsic parameter properly when the camera setting changes.** The intrinsic  value is set in K as shown below.
