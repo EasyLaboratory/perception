@@ -56,6 +56,10 @@ class DroneSensor:
         self.pid_yaw = PIDController(kp=0.1, ki=0.0, kd=0.05)
         self.pid_pitch = PIDController(kp=0.1, ki=0.0, kd=0.05)
 
+        # target track data to instruct the search strategy
+        self.yaw_error_history_val = 0.0
+        self.pitch_error_histoty_val = 0.0
+
         # camera setting
         self.K = [640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
         self.camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(self.K)
@@ -89,8 +93,6 @@ class DroneSensor:
             rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
             results=track(model,rgb_image)
             self.update_camera_eula_angle(gimbal_msg)
-            rospy.loginfo("++++++++++++++++++++++++++++++++++++++++++++++++++")
-            rospy.loginfo(f"the camera angle:{self.camera_eular_angle}")
 
             if self.state == GimbalState.INITIAL:
                 rospy.loginfo("-------------------------")
@@ -103,7 +105,8 @@ class DroneSensor:
             elif self.state == GimbalState.SEARCH:
                 rospy.loginfo("-------------------------")
                 rospy.loginfo("in search state")
-                self.send_gimbal_control((0,5))
+                # self.send_gimbal_control((0,5))
+                self.set_tracking_strategy()
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
             elif self.state == GimbalState.TRACKING:
@@ -143,6 +146,8 @@ class DroneSensor:
         offset_y = -(y - height/2)
         yaw_error = offset_x/width*self.fov_horizontal
         pitch_error = offset_y/height*self.fov_vertical
+        self.yaw_error_history_val = yaw_error
+        self.pitch_error_histoty_val = pitch_error
         # 设置pid控制死区
         if yaw_error <2.0 and yaw_error>-2.0:
             yaw_error = 0.0
@@ -215,7 +220,6 @@ class DroneSensor:
                 res_point.point.y = world_point_ENU[1]
                 res_point.point.z = world_point_ENU[2]
                 self.point_publisher.publish(res_point)
-                rospy.loginfo("ok!!!")
 
                 # # point_publisher.publish(res_point)
                 # odo_msg = Odometry()
@@ -251,6 +255,12 @@ class DroneSensor:
                 # global previous_odom
                 # previous_odom = odemetry_msg
         pass
+
+    def set_tracking_strategy(self):
+        if self.yaw_error_history_val >0:
+            self.send_gimbal_control((0,4))
+        else:
+            self.send_gimbal_control((0,-4))
     
     def update_camera_eula_angle(self,gimbal_msg):
         self.camera_eular_angle.pitch = gimbal_msg.data.data[0]
