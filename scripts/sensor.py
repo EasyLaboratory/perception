@@ -51,8 +51,8 @@ class DroneSensor:
         
         # Gimbal PID Controller
         self.state = GimbalState.INITIAL
-        self.fov_horizontal = 90  # 水平视场角
-        self.fov_vertical = 90    # 垂直视场角
+        self.fov_horizontal = 90  
+        self.fov_vertical = 90    
         self.pid_yaw = PIDController(kp=0.1, ki=0.0, kd=0.05)
         self.pid_pitch = PIDController(kp=0.1, ki=0.0, kd=0.05)
 
@@ -76,11 +76,10 @@ class DroneSensor:
         self.odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
         self.point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
         
-
         # temp var
         self.track_count = 0
         self.lost_frame = 0
-        # 创建同步器，使用 ApproximateTimeSynchronizer 允许近似时间同步
+
         self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber,self.depth_subscriber,self.gimbal_subscriber,
                                                  self.odemetry_subscriber], 
                                                 queue_size=5, slop=0.05)
@@ -95,23 +94,19 @@ class DroneSensor:
             self.update_camera_eula_angle(gimbal_msg)
 
             if self.state == GimbalState.INITIAL:
-                rospy.loginfo("-------------------------")
-                rospy.loginfo("in initial state")
+                rospy.loginfo("------------in initial state-------------")
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
                 self.reset_to_initial()
                 self.transition_to(GimbalState.SEARCH)
                 
             elif self.state == GimbalState.SEARCH:
-                rospy.loginfo("-------------------------")
-                rospy.loginfo("in search state")
-                # self.send_gimbal_control((0,5))
+                rospy.loginfo("------------in search state-------------")
                 self.set_tracking_strategy()
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
             elif self.state == GimbalState.TRACKING:
-                rospy.loginfo("-------------------------")
-                rospy.loginfo("in tracking state")
+                rospy.loginfo("------------in tracking state-------------")
                 if self.detect_target(results):
                     self.track_target(results,rgb_image)
                     self.sensor_controller(results,depth_msg,odemetry_msg)
@@ -119,8 +114,7 @@ class DroneSensor:
                 else:
                    self.transition_to(GimbalState.LOST)
             elif self.state == GimbalState.LOST:
-                rospy.loginfo("-------------------------")
-                rospy.loginfo("in lost state")
+                rospy.loginfo("------------in lost state-------------")
                 self.track_count = 0
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
@@ -221,39 +215,25 @@ class DroneSensor:
                 res_point.point.z = world_point_ENU[2]
                 self.point_publisher.publish(res_point)
 
-                # # point_publisher.publish(res_point)
-                # odo_msg = Odometry()
-                # odo_msg.header.stamp = odemetry_msg.header.stamp
-                # odo_msg.header.frame_id = "drone_1"
-                # odo_msg.pose.pose.position.x = world_point_ENU[0]
-                # odo_msg.pose.pose.position.y = world_point_ENU[1]
-                # odo_msg.pose.pose.position.z = world_point_ENU[2]
-                # # 设置方向为默认值，因为没有方向信息
-                # odo_msg.pose.pose.orientation.x = 0.0
-                # odo_msg.pose.pose.orientation.y = 0.0
-                # odo_msg.pose.pose.orientation.z = 0.0
-                # odo_msg.pose.pose.orientation.w = 1.0
-                # linear_velocity = get_linear_velocity(world_point_ENU,rospy.Time.now())
-                # odo_msg.twist.twist.linear.x = linear_velocity[0]
-                # odo_msg.twist.twist.linear.y = linear_velocity[1]
-                # odo_msg.twist.twist.linear.z = linear_velocity[2]
+                # point_publisher.publish(res_point)
+                odo_msg = Odometry()
+                odo_msg.header.stamp = odemetry_msg.header.stamp
+                odo_msg.header.frame_id = "drone_1"
+                odo_msg.pose.pose.position.x = world_point_ENU[0]
+                odo_msg.pose.pose.position.y = world_point_ENU[1]
+                odo_msg.pose.pose.position.z = world_point_ENU[2]
+                # 设置方向为默认值，因为没有方向信息
+                odo_msg.pose.pose.orientation.x = 0.0
+                odo_msg.pose.pose.orientation.y = 0.0
+                odo_msg.pose.pose.orientation.z = 0.0
+                odo_msg.pose.pose.orientation.w = 1.0
+                linear_velocity = get_linear_velocity(world_point_ENU,rospy.Time.now())
+                odo_msg.twist.twist.linear.x = linear_velocity[0]
+                odo_msg.twist.twist.linear.y = linear_velocity[1]
+                odo_msg.twist.twist.linear.z = linear_velocity[2]
 
-                # odom_publisher.publish(odo_msg)
+                self.odom_publisher.publish(odo_msg)
 
-                # global target_x,target_y
-                # target_x=world_point_ENU[0]
-                # target_y=world_point_ENU[1]
-                # drone_pos = np.array([odemetry_msg.pose.pose.position.x,odemetry_msg.pose.pose.position.y])
-               
-                # global drone_yaw
-                # drone_yaw = calculate_yaw(drone_pos,np.array([target_x,target_y]))
-                # rospy.loginfo("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
-                # rospy.loginfo(drone_yaw)
-                
-                # global previous_frame
-                # previous_frame = annotated_image[0]
-                # global previous_odom
-                # previous_odom = odemetry_msg
         pass
 
     def set_tracking_strategy(self):
