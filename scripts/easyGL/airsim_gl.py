@@ -131,9 +131,7 @@ def get_uv_depth(cv_depth:np.ndarray,u,v,scale=1,max_distance=100):
     v = int(v/scale)
     return cv_depth[v][u]/255*max_distance
 
-def get_linear_velocity(current_position,current_time:rospy.Time):
-    global previous_position
-    global previous_time
+def get_linear_velocity(current_position,current_time:rospy.Time,previous_position,previous_time):
     if previous_position is None and current_position is not None:
         previous_position = current_position
         previous_time = rospy.Time.now()

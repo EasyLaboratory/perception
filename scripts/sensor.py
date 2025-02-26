@@ -14,6 +14,8 @@ from typing import *
 import struct
 from enum import Enum,auto
 
+
+
 class GimbalState(Enum):
     INITIAL = auto()    # 初始状态：回归初始位置
     SEARCH = auto()     # 搜索状态：旋转寻找目标
@@ -79,6 +81,10 @@ class DroneSensor:
         # temp var
         self.track_count = 0
         self.lost_frame = 0
+
+        #
+        self.previous_position = None
+        self.previous_time:rospy.Time = None
 
         self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber,self.depth_subscriber,self.gimbal_subscriber,
                                                  self.odemetry_subscriber], 
@@ -196,6 +202,7 @@ class DroneSensor:
             
 
             if x!=-1 and y!=-1:
+                
                 cv_depth = self.bridge.imgmsg_to_cv2(depth_image,desired_encoding="passthrough")
                 cv_depth_r_channel = cv_depth[:,:,0]
                 depth = get_uv_depth(cv_depth_r_channel,x,y)
@@ -206,7 +213,7 @@ class DroneSensor:
                 o_array = np.array([1,0,0,0])
                 extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
                 world_point_ENU =unproject(x,y,depth,self.camera_intrinsic_matrix,self.camera_eular_angle,self.camera_translation,extrinsic_matrix)
-
+               
                 res_point = PointStamped()
                 res_point.header.stamp = odemetry_msg.header.stamp
                 res_point.header.frame_id = odemetry_msg.header.frame_id
@@ -214,7 +221,6 @@ class DroneSensor:
                 res_point.point.y = world_point_ENU[1]
                 res_point.point.z = world_point_ENU[2]
                 self.point_publisher.publish(res_point)
-
                 # point_publisher.publish(res_point)
                 odo_msg = Odometry()
                 odo_msg.header.stamp = odemetry_msg.header.stamp
@@ -227,14 +233,31 @@ class DroneSensor:
                 odo_msg.pose.pose.orientation.y = 0.0
                 odo_msg.pose.pose.orientation.z = 0.0
                 odo_msg.pose.pose.orientation.w = 1.0
-                linear_velocity = get_linear_velocity(world_point_ENU,rospy.Time.now())
+                linear_velocity = self.get_linear_velocity(world_point_ENU,rospy.Time.now())
                 odo_msg.twist.twist.linear.x = linear_velocity[0]
                 odo_msg.twist.twist.linear.y = linear_velocity[1]
                 odo_msg.twist.twist.linear.z = linear_velocity[2]
-
+                
+                rospy.loginfo("hhhhhhhhhhhhhhhhhhhhhhhhhhhhh")
                 self.odom_publisher.publish(odo_msg)
 
         pass
+    
+    def get_linear_velocity(self,current_position,current_time:rospy.Time):
+        if self.previous_position is None and current_position is not None:
+            self.previous_position = current_position
+            self.previous_time = rospy.Time.now()
+            return np.full((3,),np.nan)
+        elif self.previous_position is not None and self.previous_time is not None:
+            time_diff = (current_time-self.previous_time).to_sec()
+            if time_diff > 0:
+                # 计算位置差
+                position_diff = current_position-self.previous_position
+                linear_velocity = position_diff/time_diff
+                return linear_velocity
+        else:
+            return np.full((3,),np.nan)
+        
 
     def set_tracking_strategy(self):
         if self.yaw_error_history_val >0:
