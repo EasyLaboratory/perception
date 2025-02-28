@@ -72,11 +72,4 @@
         <remap from="input_trajectory_topic" to="/command/trajectory" />
         <remap from="cmd2controller" to="command/position_target" />
     </node>
-
-
-
-
-
-
-
 </launch>

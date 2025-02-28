@@ -7,6 +7,8 @@ import numpy as np
 import cv2
 from typing import List,Dict
 import copy
+from geometry_msgs.msg import PointStamped
+from nav_msgs.msg import Odometry
 import rospy
 
 logger = get_logger(__name__)
@@ -145,3 +147,50 @@ def get_linear_velocity(current_position,current_time:rospy.Time,previous_positi
             return linear_velocity
     else:
         return np.full((3,),np.nan)
+    
+
+def publish_point_msg(point_publisher,world_point_ENU,odemetry_msg):
+    res_point = PointStamped()
+    res_point.header.stamp = odemetry_msg.header.stamp
+    res_point.header.frame_id = odemetry_msg.header.frame_id
+    res_point.point.x = world_point_ENU[0]
+    res_point.point.y = world_point_ENU[1]
+    res_point.point.z = world_point_ENU[2]
+    point_publisher.publish(res_point)
+
+def publish_odometry_msg(odometry_publisher,world_point_ENU,odometry_msg,linear_velocity,frane_id):
+    odo_msg = Odometry()
+    odo_msg.header.stamp = odometry_msg.header.stamp
+    odo_msg.header.frame_id = frane_id
+    odo_msg.pose.pose.position.x = world_point_ENU[0]
+    odo_msg.pose.pose.position.y = world_point_ENU[1]
+    odo_msg.pose.pose.position.z = world_point_ENU[2]
+    # 设置方向为默认值，因为没有方向信息
+    odo_msg.pose.pose.orientation.x = 0.0
+    odo_msg.pose.pose.orientation.y = 0.0
+    odo_msg.pose.pose.orientation.z = 0.0
+    odo_msg.pose.pose.orientation.w = 1.0
+    odo_msg.twist.twist.linear.x = linear_velocity[0]
+    odo_msg.twist.twist.linear.y = linear_velocity[1]
+    odo_msg.twist.twist.linear.z = linear_velocity[2]
+    odometry_publisher.publish(odo_msg)
+
+
+def get_detect_target(bridge,results,odometry_msg,depth_image):
+    cat2id2_xywhbox = get_target_category_box(results,[0])
+    x,y,w,h = get_box(cat2id2_xywhbox,0,1)       
+    conf = get_conf(results,[0])
+    if not conf or conf[0.0][1.0] < 0.4:
+        return
+    else:
+        conf_label = conf[0.0][1.0]
+    if x!=-1 and y!=-1:
+                
+        cv_depth = bridge.imgmsg_to_cv2(depth_image,desired_encoding="passthrough")
+        cv_depth_r_channel = cv_depth[:,:,0]
+        depth = get_uv_depth(cv_depth_r_channel,x,y)
+        t = odometry_msg.pose.pose.position
+        t_array = np.array([t.x,t.y,t.z])
+        o_array = np.array([1,0,0,0])
+        extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
+        world_point_ENU =unproject(x,y,depth,camera_intrinsic_matrix,camera_eular_angle,camera_translation,extrinsic_matrix)
