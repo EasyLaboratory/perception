@@ -7,6 +7,8 @@ import numpy as np
 import cv2
 from typing import List,Dict
 import copy
+from typing import Union
+from typing import Tuple
 from geometry_msgs.msg import PointStamped
 from nav_msgs.msg import Odometry
 import rospy
@@ -21,8 +23,14 @@ def track(model:ultralytics.YOLO,image:np.ndarray)->ultralytics.engine.results:
     return result
 
 
-def get_target_category_box(results:List,target_category_list:List[str],box_type = "xywh")->Dict: 
-    # {car:{1:[],2:[]}}
+def get_target_category_box(results:List,target_category_list:List[int],box_type = "xywh")->Dict: 
+    """Parse from the yolo model target tracking results in specific format.
+    Args:
+        results: yolo model target tracking results
+        target_category_list: the target id
+    Returns:
+        Dict:{car:{1:[],2:[]}}
+    """
     cat2id2box = {}
     for result in results:
         box:ultralytics.engine.results.Boxes = result.boxes
@@ -65,6 +73,14 @@ def get_uv(cat2id2box,category,id)->List[int]:
     return []
 
 def get_box(cat2id2box,category,id):
+    """Find the category id in the cat2id2box dictionary
+    Args:
+        cat2id2box: dictionary
+        category: category key value
+        id: id key value
+    Returns:
+        boundary box tuple, if the cat2id2box is None return -1,-1,-1,-1 
+    """
     if cat2id2box:
         return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1]),int(cat2id2box[category][id][2]),int(cat2id2box[category][id][3])
     return -1,-1,-1,-1
@@ -175,13 +191,36 @@ def publish_odometry_msg(odometry_publisher,world_point_ENU,odometry_msg,linear_
     odo_msg.twist.twist.linear.z = linear_velocity[2]
     odometry_publisher.publish(odo_msg)
 
+def publish_annotated_image(bridge,annotated_frame_publisher,results,conf_label):
+    cat2id2_xyxybox = get_target_category_box(results,[0],box_type="xyxy")
+    x1,y1,x2,y2 = get_box(cat2id2_xyxybox,0,1)
+    annotated_image=get_annotated_image(results,"ship",conf_label,x1,y1,x2,y2)
+    if annotated_image:
+        first_image = annotated_image[0]
+        # Convert the processed image (result) back to a ROS Image message
+        annotated_msg = bridge.cv2_to_imgmsg(first_image, encoding='bgr8')
+        # Publish the annotaprint(a)ted target
+        annotated_frame_publisher.publish(annotated_msg)
 
-def get_detect_target(bridge,results,odometry_msg,depth_image):
+def get_detect_target(bridge,results,odometry_msg,depth_image,camera_intrinsic_matrix,
+                      camera_eular_angle,camera_translation)->Tuple[Union[None,np.array],float]:
+    """Get the 3D position of the target from target bounding box and center point depth.
+    Args:
+        bridge: ros image cv bridge to convert ros message to numpy array.
+        results: YOLO target tracking results.
+        odometry_msg: ego drone pose and position message
+        depth_msg: depth value from the depth camera.
+        camera_intrinsic_matrix: intrinx matrix of the camera.
+        camera_eular_angle: gimbal rotation eular angle
+        camera_translation: gimabal position relative to the dorne
+    Returns:
+        Tuple: target world ENU position and confidence, if not find the target return None
+    """
     cat2id2_xywhbox = get_target_category_box(results,[0])
     x,y,w,h = get_box(cat2id2_xywhbox,0,1)       
     conf = get_conf(results,[0])
     if not conf or conf[0.0][1.0] < 0.4:
-        return
+        return None,-1.0
     else:
         conf_label = conf[0.0][1.0]
     if x!=-1 and y!=-1:
@@ -194,3 +233,4 @@ def get_detect_target(bridge,results,odometry_msg,depth_image):
         o_array = np.array([1,0,0,0])
         extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
         world_point_ENU =unproject(x,y,depth,camera_intrinsic_matrix,camera_eular_angle,camera_translation,extrinsic_matrix)
+        return world_point_ENU,conf_label

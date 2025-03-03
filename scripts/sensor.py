@@ -14,6 +14,8 @@ from easyGL.easyGimbal import GimbalState
 from easyGL.easyGimbal import PIDController
 from easyGL.easyGimbal import VisualServo
 from easyGL.airsim_gl import publish_point_msg
+from easyGL.airsim_gl import publish_annotated_image
+from easyGL.airsim_gl import get_detect_target
 
 
 
@@ -169,46 +171,15 @@ class DroneSensor:
         
     def sensor_controller(self,results,depth_image,odometry_msg):
         if len(results) == 1:
-            cat2id2_xywhbox = get_target_category_box(results,[0])
-            x,y,w,h = get_box(cat2id2_xywhbox,0,1)
-            
-            conf = get_conf(results,[0])
-            if not conf or conf[0.0][1.0] < 0.4:
-                return
-            else:
-                conf_label = conf[0.0][1.0]
-            
-            cat2id2_xyxybox = get_target_category_box(results,[0],box_type="xyxy")
-            x1,y1,x2,y2 = get_box(cat2id2_xyxybox,0,1)
-            annotated_image=get_annotated_image(results,"ship",conf_label,x1,y1,x2,y2)
-            if annotated_image:
-                first_image = annotated_image[0]
-                # Convert the processed image (result) back to a ROS Image message
-                annotated_msg = self.bridge.cv2_to_imgmsg(first_image, encoding='bgr8')
-
-                # Publish the annotaprint(a)ted target
-                self.annotated_frame_publisher.publish(annotated_msg)
-            
-   
-            if x!=-1 and y!=-1:
-                
-                cv_depth = self.bridge.imgmsg_to_cv2(depth_image,desired_encoding="passthrough")
-                cv_depth_r_channel = cv_depth[:,:,0]
-                depth = get_uv_depth(cv_depth_r_channel,x,y)
-                rospy.loginfo("******************************************")
-                rospy.loginfo(depth)
-                t = odometry_msg.pose.pose.position
-                t_array = np.array([t.x,t.y,t.z])
-                o_array = np.array([1,0,0,0])
-                extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
-                world_point_ENU =unproject(x,y,depth,self.camera_intrinsic_matrix,self.camera_eular_angle,self.camera_translation,extrinsic_matrix)
-                
-                # publish point msg for rviz debug
-                publish_point_msg(self.point_publisher,world_point_ENU,odometry_msg)
-
-                # publish odometry message for planner
-                linear_velocity = self.get_linear_velocity(world_point_ENU,rospy.Time.now())
-                publish_odometry_msg(self.odom_publisher,world_point_ENU,odometry_msg,linear_velocity,"drone_1")
+            world_point_ENU,conf_label = get_detect_target(self.bridge,results,odometry_msg,
+                                                           depth_image,self.camera_intrinsic_matrix,
+                                                           self.camera_eular_angle,self.camera_translation)
+            publish_annotated_image(self.bridge,self.annotated_frame_publisher,results,conf_label)
+            # publish point msg for rviz debug
+            publish_point_msg(self.point_publisher,world_point_ENU,odometry_msg)
+            # publish odometry message for planner
+            linear_velocity = self.get_linear_velocity(world_point_ENU,rospy.Time.now())
+            publish_odometry_msg(self.odom_publisher,world_point_ENU,odometry_msg,linear_velocity,"drone_1")
     
     def get_linear_velocity(self,current_position,current_time:rospy.Time):
         if self.previous_position is None and current_position is not None:
