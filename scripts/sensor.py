@@ -6,7 +6,7 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 from geometry_msgs.msg import PointStamped
 from perception.msg import GimbalControl
 from easyGL.airsim_gl import *
-from model_loader import model
+from model_loader import get_model
 import socket
 from typing import *
 import struct
@@ -16,6 +16,7 @@ from easyGL.easyGimbal import VisualServo
 from easyGL.airsim_gl import publish_point_msg
 from easyGL.airsim_gl import publish_annotated_image
 from easyGL.airsim_gl import get_detect_target
+from easyGL.airsim_gl import analyse_error
 
 
 
@@ -35,7 +36,7 @@ class DroneSensor:
         self.odemetry_subscriber = Subscriber("/airsim_node/drone_1/odom_local_enu",Odometry)
 
         # topic to analyse the error
-        # self.target_position_truth = Subscriber("/easysim_ros_wrapper/player_odom",Odometry)
+        self.target_position_truth = Subscriber("/easysim_ros_wrapper/player_odom",Odometry)
         
         # Gimbal PID Controller
         self.state = GimbalState.INITIAL
@@ -43,6 +44,9 @@ class DroneSensor:
         self.fov_vertical = 90    
         self.pid_yaw = PIDController(kp=0.1, ki=0.0, kd=0.05)
         self.pid_pitch = PIDController(kp=0.1, ki=0.0, kd=0.05)
+        
+        # YOLO model
+        self.model = get_model()
 
         # target track data to instruct the search strategy
         self.yaw_error_history_val = 0.0
@@ -68,20 +72,24 @@ class DroneSensor:
         self.track_count = 0
         self.lost_frame = 0
 
+        # previous position and time for velocity calculation
+        self.previous_position = None
+        self.previous_time = None
+
         # visual servo controller
         self.visual_servo = VisualServo(50,50)
 
         self.sync = ApproximateTimeSynchronizer([self.rgb_subscriber,self.depth_subscriber,self.gimbal_subscriber,
-                                                 self.odemetry_subscriber], 
+                                                 self.odemetry_subscriber,self.target_position_truth], 
                                                 queue_size=5, slop=0.05)
         self.sync.registerCallback(self.synced_callback)
         rospy.on_shutdown(self.clean_up)
 
-    def synced_callback(self, rgb_msg,depth_msg,gimbal_msg,odemetry_msg):
+    def synced_callback(self, rgb_msg,depth_msg,gimbal_msg,odemetry_msg,target_position_truth):
         try:
             # 转换 RGB 图像
             rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
-            results=track(model,rgb_image)
+            results=track(self.model,rgb_image)
             self.update_camera_eula_angle(gimbal_msg)
 
             if self.state == GimbalState.INITIAL:
@@ -99,9 +107,9 @@ class DroneSensor:
             elif self.state == GimbalState.TRACKING:
                 rospy.loginfo("------------in tracking state-------------")
                 if self.detect_target(results):
-                    self.visual_servo.control(odemetry_msg,gimbal_msg)
+                    # self.visual_servo.control(odemetry_msg,gimbal_msg)
                     self.gimbal_track_target(results,rgb_image)
-                    self.sensor_controller(results,depth_msg,odemetry_msg)
+                    self.sensor_send_3D_position(results,depth_msg,odemetry_msg,target_position_truth)
                     self.track_count += 1
                 else:
                    self.transition_to(GimbalState.LOST)
@@ -169,7 +177,7 @@ class DroneSensor:
     def transition_to(self,new_state):
         self.state = new_state
         
-    def sensor_controller(self,results,depth_image,odometry_msg):
+    def sensor_send_3D_position(self,results,depth_image,odometry_msg,target_position_truth):
         if len(results) == 1:
             world_point_ENU,conf_label = get_detect_target(self.bridge,results,odometry_msg,
                                                            depth_image,self.camera_intrinsic_matrix,
@@ -180,7 +188,10 @@ class DroneSensor:
             # publish odometry message for planner
             linear_velocity = self.get_linear_velocity(world_point_ENU,rospy.Time.now())
             publish_odometry_msg(self.odom_publisher,world_point_ENU,odometry_msg,linear_velocity,"drone_1")
-    
+            # analyse error
+            analyse_error(target_position_truth,world_point_ENU,linear_velocity)
+
+
     def get_linear_velocity(self,current_position,current_time:rospy.Time):
         if self.previous_position is None and current_position is not None:
             self.previous_position = current_position
@@ -196,8 +207,6 @@ class DroneSensor:
         else:
             return np.full((3,),np.nan)
         
-    def analyse_error():
-        pass
 
 
     def set_tracking_strategy(self):

@@ -234,3 +234,13 @@ def get_detect_target(bridge,results,odometry_msg,depth_image,camera_intrinsic_m
         extrinsic_matrix = construct_extrinsic_with_quaternion(o_array,t_array)
         world_point_ENU =unproject(x,y,depth,camera_intrinsic_matrix,camera_eular_angle,camera_translation,extrinsic_matrix)
         return world_point_ENU,conf_label
+    
+def analyse_error(target_position_truth,position_3D,velocity_3D):
+    position_truth = np.zeros(3)
+    velocity_truth = np.zeros(3)
+    # rospy.loginfo(target_position_truth)
+    rospy.loginfo(target_position_truth.pose.pose.position.x)
+    position_truth[0] = target_position_truth.pose.pose.position.x
+    position_truth[1] = target_position_truth.pose.pose.position.y
+    position_truth[2] = target_position_truth.pose.pose.position.z
+    rospy.loginfo(position_truth)
