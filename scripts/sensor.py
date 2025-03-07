@@ -17,6 +17,7 @@ from easyGL.airsim_gl import publish_point_msg
 from easyGL.airsim_gl import publish_annotated_image
 from easyGL.airsim_gl import get_detect_target
 from easyGL.airsim_gl import analyse_error
+from geometry_msgs.msg import Vector3
 
 
 
@@ -66,11 +67,15 @@ class DroneSensor:
         # topic to control the drone
         self.annotated_frame_publisher = rospy.Publisher("/annotated_image",Image,queue_size=9)
         self.odom_publisher = rospy.Publisher('/target/odom_airsim', Odometry, queue_size=10)
-        self.point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
 
         # temp var
         self.track_count = 0
         self.lost_frame = 0
+
+        # error analyse
+        self.point_publisher = rospy.Publisher('points', PointStamped, queue_size=10)
+        self.position_error_publisher = rospy.Publisher("position_error",Vector3,queue_size=10)
+        self.velocity_error_publisher = rospy.Publisher("velocity_error",Vector3,queue_size=10)
 
         # previous position and time for velocity calculation
         self.previous_position = None
@@ -89,6 +94,7 @@ class DroneSensor:
         try:
             # 转换 RGB 图像
             rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
+            rospy.loginfo(f"{rgb_image.shape[0]}-{rgb_image.shape[1]}")
             results=track(self.model,rgb_image)
             self.update_camera_eula_angle(gimbal_msg)
 
@@ -189,7 +195,8 @@ class DroneSensor:
             linear_velocity = self.get_linear_velocity(world_point_ENU,rospy.Time.now())
             publish_odometry_msg(self.odom_publisher,world_point_ENU,odometry_msg,linear_velocity,"drone_1")
             # analyse error
-            analyse_error(target_position_truth,world_point_ENU,linear_velocity)
+            analyse_error(self.position_error_publisher,self.velocity_error_publisher,
+                          target_position_truth,world_point_ENU,linear_velocity)
 
 
     def get_linear_velocity(self,current_position,current_time:rospy.Time):

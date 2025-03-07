@@ -12,6 +12,7 @@ from typing import Tuple
 from geometry_msgs.msg import PointStamped
 from nav_msgs.msg import Odometry
 import rospy
+from geometry_msgs.msg import Vector3
 
 logger = get_logger(__name__)
 
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
         
 
 def track(model:ultralytics.YOLO,image:np.ndarray)->ultralytics.engine.results:
-    result = model.track(image)[0]
+    result = model.track(image,imgsz=(736,1088))[0]
     return result
 
 
@@ -85,9 +86,6 @@ def get_box(cat2id2box,category,id):
         return int(cat2id2box[category][id][0]),int(cat2id2box[category][id][1]),int(cat2id2box[category][id][2]),int(cat2id2box[category][id][3])
     return -1,-1,-1,-1
 
-# def get_conf(cat2id2box,category,id):
-#     if cat2id2box:
-#         return cat2id2box[category][]
 
 def get_annotated_image(results:List[ultralytics.engine.results.Results],label,conf,x1,y1,x2,y2):
     if x1==-1 and x2==-1 and y1==-1 and y2 == -1:
@@ -235,12 +233,31 @@ def get_detect_target(bridge,results,odometry_msg,depth_image,camera_intrinsic_m
         world_point_ENU =unproject(x,y,depth,camera_intrinsic_matrix,camera_eular_angle,camera_translation,extrinsic_matrix)
         return world_point_ENU,conf_label
     
-def analyse_error(target_position_truth,position_3D,velocity_3D):
+def analyse_error(position_error_publisher:rospy.Publisher,velocity_error_publisher:rospy.Publisher,
+                  target_position_truth,position_3D,velocity_3D):
     position_truth = np.zeros(3)
     velocity_truth = np.zeros(3)
-    # rospy.loginfo(target_position_truth)
     rospy.loginfo(target_position_truth.pose.pose.position.x)
     position_truth[0] = target_position_truth.pose.pose.position.x
     position_truth[1] = target_position_truth.pose.pose.position.y
     position_truth[2] = target_position_truth.pose.pose.position.z
-    rospy.loginfo(position_truth)
+    position_error = position_3D-position_truth
+
+    velocity_truth[0] = target_position_truth.twist.twist.linear.x
+    velocity_truth[1] = target_position_truth.twist.twist.linear.y
+    velocity_truth[2] = target_position_truth.twist.twist.linear.z
+    velocity_error = velocity_3D-velocity_truth
+    
+    position_error_vector = Vector3()
+    position_error_vector.x = position_error[0]
+    position_error_vector.y = position_error[1]
+    position_error_vector.z = position_error[2]
+    velocity_error_vector = Vector3()
+    velocity_error_vector.x = velocity_error[0]
+    velocity_error_vector.y = velocity_error[1]
+    velocity_error_vector.z = velocity_error[2]
+    rospy.loginfo(f"position error:{position_error}")
+    rospy.loginfo(f"velocity error:{velocity_error}")
+    position_error_publisher.publish(position_error_vector)
+    velocity_error_publisher.publish(velocity_error_vector)
+    

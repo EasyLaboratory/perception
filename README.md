@@ -12,9 +12,10 @@
     ```
 2. Set up the virtual environment
     ```bash
-    python -m venv yolo_venv
+    sudo apt install python3-venv
+    python3 -m venv yolo_venv
     source yolo_venv/bin/activate
-    pip install -r requirements.txt
+    pip install -r requirements.txt -i https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple some-package
     ```
 3. Start the airsim ros node, referring to [airsim official page](https://microsoft.github.io/AirSim/airsim_ros_pkgs/]).  
 
