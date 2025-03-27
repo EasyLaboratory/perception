@@ -49,6 +49,10 @@ cd easyTrack
 source ./devel/setup.bash
 roslaunch se3controller flying_example.launch 
 ```
+5. Analyse the error.
+```bash
+rqt_plot /position_error/x  /position_error/y /position_error/z
+```
 
 ## Tips
 1. Use the settings in etc directory.

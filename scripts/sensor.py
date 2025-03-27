@@ -25,7 +25,14 @@ from geometry_msgs.msg import Vector3
 
 
 class DroneSensor:
-    def __init__(self):
+    """
+    Define and run the drone sensor.
+    The simulator camera settings:
+        Depth resolution 1280*720;
+        RGB resolution 1280*720;
+        RGB HFOV: 90 degree VFOV:90 degree
+    """
+    def __init__(self,rgb_width = 1920,rgb_height=720,rgb_fov=90):
         # create ROS node and cv object
         rospy.init_node('Gimbal', anonymous=True)
         self.bridge = CvBridge()
@@ -54,8 +61,10 @@ class DroneSensor:
         self.pitch_error_histoty_val = 0.0
 
         # camera setting
-        self.K = [640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
-        self.camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(self.K)
+        self.rgb_width = rgb_width
+        self.rgb_height = rgb_height
+        self.rgb_fov = rgb_fov
+        self.camera_intrinsic_matrix = self.construct_intrinsic_matrix_in_simulator()
         self.camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
         self.camera_translation = Translation(x=0,y=0,z=0)
 
@@ -92,6 +101,7 @@ class DroneSensor:
 
     def synced_callback(self, rgb_msg,depth_msg,gimbal_msg,odemetry_msg,target_position_truth):
         try:
+            rospy.loginfo("进来了")
             # 转换 RGB 图像
             rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
             rospy.loginfo(f"{rgb_image.shape[0]}-{rgb_image.shape[1]}")
@@ -127,6 +137,18 @@ class DroneSensor:
                 self.transition_to(GimbalState.SEARCH)
         except Exception as e:
             pass
+
+    def construct_intrinsic_matrix_in_simulator(self):
+        cx = self.rgb_width/2
+        cy = self.rgb_height/2
+        fx = self.rgb_width/(2*np.tan(np.radians(self.rgb_fov)))
+        fy = self.rgb_height/(2*np.tan(np.radians(self.rgb_fov)))
+        k_inv = np.array([
+        [1 / fx, 0, -cx / fx],
+        [0, 1 / fy, -cy / fy],
+        [0, 0, 1]
+        ])
+        return k_inv
     
     def detect_target(self,results):
         if len(results) == 1:
