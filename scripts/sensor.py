@@ -32,7 +32,7 @@ class DroneSensor:
         RGB resolution 1280*720;
         RGB HFOV: 90 degree VFOV:90 degree
     """
-    def __init__(self,rgb_width = 1920,rgb_height=720,rgb_fov=90):
+    def __init__(self,rgb_width = 1280,rgb_height=720,rgb_fov=90):
         # create ROS node and cv object
         rospy.init_node('Gimbal', anonymous=True)
         self.bridge = CvBridge()
