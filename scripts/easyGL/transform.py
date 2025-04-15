@@ -203,9 +203,9 @@ def camera2mavENU(camera_xyz,camera_eular:Eular_angle,
                             [0, -1, 0]])
     camera_xyz = camera_coord2camera_ENU@camera_xyz
 
-    quaternion = tft.quaternion_from_euler(camera_eular.ENU_yaw_rad,
+    quaternion = tft.quaternion_from_euler(camera_eular.ENU_roll_rad,
                                         camera_eular.ENU_pitch_rad,
-                                        camera_eular.ENU_roll_rad)
+                                        camera_eular.ENU_yaw_rad)
     rotation_matrix = tft.quaternion_matrix(quaternion)[:3, :3]
     # r_yaw = np.array([
     #     [np.cos(camera_eular.ENU_yaw_rad), -np.sin(camera_eular.ENU_yaw_rad), 0],

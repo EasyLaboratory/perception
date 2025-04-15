@@ -28,8 +28,8 @@ class DroneSensor:
     """
     Define and run the drone sensor.
     The simulator camera settings:
-        Depth resolution 1280*720;
-        RGB resolution 1280*720;
+        Depth resolution 1080*720;
+        RGB resolution 1080*720;
         RGB HFOV: 90 degree VFOV:90 degree
     """
     def __init__(self,rgb_width = 1280,rgb_height=720,rgb_fov=90):
@@ -43,6 +43,9 @@ class DroneSensor:
         self.gimbal_subscriber = Subscriber("/gimbal_control",GimbalControl)
         self.odemetry_subscriber = Subscriber("/airsim_node/drone_1/odom_local_enu",Odometry)
 
+        # yolo model 
+        self.model = get_model()
+
         # topic to analyse the error
         self.target_position_truth = Subscriber("/easysim_ros_wrapper/player_odom",Odometry)
         
@@ -50,8 +53,8 @@ class DroneSensor:
         self.state = GimbalState.INITIAL
         self.fov_horizontal = 90  
         self.fov_vertical = 90    
-        self.pid_yaw = PIDController(kp=0.8, ki=0.0, kd=0.05)
-        self.pid_pitch = PIDController(kp=0.8, ki=0.0, kd=0.05)
+        self.pid_yaw = PIDController(kp=0.5, ki=0.0, kd=0.05)
+        self.pid_pitch = PIDController(kp=0.5, ki=0.0, kd=0.05)
 
         # target track data to instruct the search strategy
         self.yaw_error_history_val = 0.0
@@ -60,7 +63,7 @@ class DroneSensor:
         # camera setting
         # self.K = [640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
 
-        self.K = [540.0, 0.0, 540.0, 0.0, 360.0, 360.0, 0.0, 0.0, 1.0]
+        self.K = [540.0, 0.0, 540.0, 0.0, 540.0, 360.0, 0.0, 0.0, 1.0]
 
         self.camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(self.K)
         self.camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
@@ -111,18 +114,18 @@ class DroneSensor:
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
                 self.reset_to_initial()
-                self.transition_to(GimbalState.SEARCH)
+                self.transition_to(GimbalState.TRACKING)
                 
             elif self.state == GimbalState.SEARCH:
                 rospy.loginfo("------------in search state-------------")
-                self.set_tracking_strategy()
+                # self.set_tracking_strategy()
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
             elif self.state == GimbalState.TRACKING:
                 rospy.loginfo("------------in tracking state-------------")
                 if self.detect_target(results):
                     # self.visual_servo.control(odemetry_msg,gimbal_msg)
-                    self.gimbal_track_target(results,rgb_image)
+                    # self.gimbal_track_target(results,rgb_image)
                     self.sensor_send_3D_position(results,depth_msg,odemetry_msg,target_position_truth)
                     self.track_count += 1
                 else:
@@ -133,6 +136,7 @@ class DroneSensor:
                 if self.detect_target(results):
                     self.transition_to(GimbalState.TRACKING)
                 self.transition_to(GimbalState.SEARCH)
+                pass
         except Exception as e:
             pass
 
@@ -241,6 +245,7 @@ class DroneSensor:
             self.send_gimbal_control((0,4))
         else:
             self.send_gimbal_control((0,-4))
+        pass
     
     def update_camera_eula_angle(self,gimbal_msg):
         self.camera_eular_angle.pitch = gimbal_msg.data.data[0]
