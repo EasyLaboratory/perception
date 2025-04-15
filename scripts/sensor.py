@@ -50,21 +50,19 @@ class DroneSensor:
         self.state = GimbalState.INITIAL
         self.fov_horizontal = 90  
         self.fov_vertical = 90    
-        self.pid_yaw = PIDController(kp=0.1, ki=0.0, kd=0.05)
-        self.pid_pitch = PIDController(kp=0.1, ki=0.0, kd=0.05)
-        
-        # YOLO model
-        self.model = get_model()
+        self.pid_yaw = PIDController(kp=0.8, ki=0.0, kd=0.05)
+        self.pid_pitch = PIDController(kp=0.8, ki=0.0, kd=0.05)
 
         # target track data to instruct the search strategy
         self.yaw_error_history_val = 0.0
         self.pitch_error_histoty_val = 0.0
 
         # camera setting
-        self.rgb_width = rgb_width
-        self.rgb_height = rgb_height
-        self.rgb_fov = rgb_fov
-        self.camera_intrinsic_matrix = self.construct_intrinsic_matrix_in_simulator()
+        # self.K = [640.0, 0.0, 640.0, 0.0, 640.0, 360.0, 0.0, 0.0, 1.0]
+
+        self.K = [540.0, 0.0, 540.0, 0.0, 360.0, 360.0, 0.0, 0.0, 1.0]
+
+        self.camera_intrinsic_matrix = construct_inverse_intrinsic_with_k(self.K)
         self.camera_eular_angle = Eular_angle(pitch=0,roll=0,yaw=0)
         self.camera_translation = Translation(x=0,y=0,z=0)
 
